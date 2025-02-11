@@ -9,24 +9,6 @@ const { setModuleImports, getAssemblyExports, getConfig } = await dotnet
 const config = getConfig();
 const isDebug = config?.applicationEnvironment == 'Development';
 
-
-
-Sentry.init({
-    dsn: 'https://e17358aac4344e759b8f1b748f8c1544@todo.dyndns.hu/1',
-    release: '1.0.0',
-    //debug: isDebug,
-    environment: isDebug ? "debug" : undefined,
-    integrations: [
-
-        // If you use a bundle with performance monitoring enabled, add the BrowserTracing integration
-        Sentry.browserTracingIntegration(),
-        // If you use a bundle with session replay enabled, add the Replay integration
-        //Sentry.replayIntegration(),
-    ],
-    tracesSampleRate: isDebug ? 1.0 : 0.3,
-});
-
-
 const exports = await getAssemblyExports(config.mainAssemblyName);
 
 console.log(`Is debug: ${isDebug}`);
@@ -66,11 +48,11 @@ setModuleImports("main.js", {
         }
 
         var keyDown = (e: KeyboardEvent) => {
-            keyBoard.currKeys[e.code] = true;
+            keyBoard.currKeys[e.code] = false;
         };
 
         var keyUp = (e: KeyboardEvent) => {
-            keyBoard.currKeys[e.code] = false;
+            keyBoard.currKeys[e.code] = true;
         };
 
         canvas.addEventListener("keydown", keyDown, false);
