@@ -1,9 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using SnakeCore;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Transactions;
 
 namespace SnakeFNA
 {
@@ -13,6 +10,9 @@ namespace SnakeFNA
         private readonly GraphicsDevice _graphicsDevice;
         private readonly BasicEffect _effect;
         private SpriteBatch _spriteBatch;
+        private Vector2 _cameraPosition;
+        private float _cameraRotation;
+        private float _cameraZoom = 1.0f;
 
         public FNARenderer(GraphicsDevice graphicsDevice)
         {
@@ -38,11 +38,24 @@ namespace SnakeFNA
 
             _beginCalled = true;
 
+            // Get screen center for zoom origin
+            var viewport = _graphicsDevice.Viewport;
+            var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
+
+            // Create transform matrix for camera - order matters!
+            var transform = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *  // Move to origin
+                           Matrix.CreateScale(_cameraZoom) *                                  // Apply zoom
+                           Matrix.CreateRotationZ(_cameraRotation) *                         // Apply rotation
+                           Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *     // Move back
+                           Matrix.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0); // Apply camera position
+
             _spriteBatch.Begin(SpriteSortMode.Deferred,
                 BlendState.AlphaBlend,
                 SamplerState.LinearClamp,
                 DepthStencilState.Default,
-                RasterizerState.CullCounterClockwise);
+                RasterizerState.CullCounterClockwise,
+                null,
+                transform);
         }
 
         public void End()
@@ -77,6 +90,45 @@ namespace SnakeFNA
             fixed (byte* p = data) texture.SetDataPointerEXT(0, null, (nint)p, data.Length);
 
             return texture;
+        }
+
+        public void SetCamera(System.Numerics.Vector2 position, float rotation, float zoom)
+        {
+            _cameraPosition = new Vector2(position.X, position.Y);
+            _cameraRotation = rotation;
+            _cameraZoom = zoom;
+        }
+
+        public System.Numerics.Vector2 ScreenToWorld(System.Numerics.Vector2 screenPosition)
+        {
+            var viewport = _graphicsDevice.Viewport;
+            var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
+
+            var matrix = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
+                        Matrix.CreateScale(_cameraZoom) *
+                        Matrix.CreateRotationZ(_cameraRotation) *
+                        Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
+                        Matrix.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
+            
+            matrix = Matrix.Invert(matrix);
+
+            var pos = Vector2.Transform(new Vector2(screenPosition.X, screenPosition.Y), matrix);
+            return new System.Numerics.Vector2(pos.X, pos.Y);
+        }
+
+        public System.Numerics.Vector2 WorldToScreen(System.Numerics.Vector2 worldPosition)
+        {
+            var viewport = _graphicsDevice.Viewport;
+            var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
+
+            var matrix = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
+                        Matrix.CreateScale(_cameraZoom) *
+                        Matrix.CreateRotationZ(_cameraRotation) *
+                        Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
+                        Matrix.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
+
+            var pos = Vector2.Transform(new Vector2(worldPosition.X, worldPosition.Y), matrix);
+            return new System.Numerics.Vector2(pos.X, pos.Y);
         }
     }
 }

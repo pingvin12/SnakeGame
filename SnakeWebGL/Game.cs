@@ -80,6 +80,10 @@ public class Game
         private VertexPositionColorTexture[] _buffer;
         private Texture2D[] _textures;
 
+        private Vector2 _cameraPosition;
+        private float _cameraRotation;
+        private float _cameraZoom = 1.0f;
+
         public unsafe WebGlRenderer(GL gl, int gameWidth, int gameHeight)
         {
             Gl = gl;
@@ -321,14 +325,28 @@ public class Game
         public unsafe void EndRender()
         {
             Gl.Enable(EnableCap.Blend);
-            Gl.BlendFunc(BlendingFactor.SrcColor, BlendingFactor.One);
-            Gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
-            Gl.BlendFunc(BlendingFactor.DstColor, BlendingFactor.OneMinusSrcColor);
-            Gl.BlendFunc(BlendingFactor.DstAlpha, BlendingFactor.OneMinusSrcAlpha);
+            Gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-            var projection = Matrix4x4.CreateOrthographicOffCenter(0f, _gameWidth, _gameHeight, 0f, 0f, 2f);
+            // Create view matrix for camera
+            var screenCenter = new Vector2(_gameWidth / 2f, _gameHeight / 2f);
+            
+            var view = Matrix4x4.Identity;
+            view = Matrix4x4.Multiply(view, Matrix4x4.CreateTranslation(screenCenter.X, screenCenter.Y, 0));
+            view = Matrix4x4.Multiply(view, Matrix4x4.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0));
+            view = Matrix4x4.Multiply(view, Matrix4x4.CreateRotationZ(_cameraRotation));
+            view = Matrix4x4.Multiply(view, Matrix4x4.CreateScale(_cameraZoom, _cameraZoom, 1));
+            view = Matrix4x4.Multiply(view, Matrix4x4.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0));
+
+            var projection = Matrix4x4.CreateOrthographicOffCenter(
+                0f, _gameWidth,
+                _gameHeight, 0f,
+                -1f, 1f
+            );
+
+            var mvp = Matrix4x4.Multiply(view, projection);
+
             Gl.UseProgram(_shaderProgram);
-            Gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&projection);
+            Gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&mvp);
 
             Gl.BindVertexArray(_vao);
 
@@ -365,6 +383,45 @@ public class Game
         internal void SetCanvasSize(int canvasWidth, int canvasHeight)
         {
             Gl.Viewport(0, 0, (uint)canvasWidth, (uint)canvasHeight);
+        }
+
+        public void SetCamera(Vector2 position, float rotation, float zoom)
+        {
+            _cameraPosition = position;
+            _cameraRotation = rotation;
+            _cameraZoom = zoom;
+        }
+
+        public Vector2 ScreenToWorld(Vector2 screenPosition)
+        {
+            var screenCenter = new Vector2(_gameWidth / 2f, _gameHeight / 2f);
+            
+            var transform = Matrix4x4.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
+                           Matrix4x4.CreateScale(_cameraZoom) *
+                           Matrix4x4.CreateRotationZ(_cameraRotation) *
+                           Matrix4x4.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
+                           Matrix4x4.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
+
+            if (Matrix4x4.Invert(transform, out var inverse))
+            {
+                var pos = Vector3.Transform(new Vector3(screenPosition, 0), inverse);
+                return new Vector2(pos.X, pos.Y);
+            }
+            return screenPosition;
+        }
+
+        public Vector2 WorldToScreen(Vector2 worldPosition)
+        {
+            var screenCenter = new Vector2(_gameWidth / 2f, _gameHeight / 2f);
+            
+            var transform = Matrix4x4.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
+                           Matrix4x4.CreateScale(_cameraZoom) *
+                           Matrix4x4.CreateRotationZ(_cameraRotation) *
+                           Matrix4x4.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
+                           Matrix4x4.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
+
+            var pos = Vector3.Transform(new Vector3(worldPosition, 0), transform);
+            return new Vector2(pos.X, pos.Y);
         }
     }
 }

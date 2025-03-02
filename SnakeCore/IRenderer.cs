@@ -19,7 +19,13 @@ public interface IRenderer<T> : IRenderer
         }
 
         DrawImage(handle.Value, position, size, rotation, origin, sourceRectangle, color);
-    } 
+    }
+
+    void SetCamera(Vector2 position, float rotation, float zoom);
+    
+    Vector2 ScreenToWorld(Vector2 screenPosition);
+    
+    Vector2 WorldToScreen(Vector2 worldPosition);
 }
 
 public interface IRenderer
@@ -27,6 +33,12 @@ public interface IRenderer
     ImageHandle CreateImage(int width, int height, ReadOnlySpan<byte> data);
 
     void DrawImage(ImageHandle image, Vector2 position, Vector2 size, float rotation, Vector2 origin, Rectangle sourceRectangle, Color color);
+
+    void SetCamera(Vector2 position, float rotation, float zoom);
+    
+    Vector2 ScreenToWorld(Vector2 screenPosition);
+    
+    Vector2 WorldToScreen(Vector2 worldPosition);
 }
 
 public record class ImageHandle<T>(T Value, int Width, int Height) : ImageHandle(Width, Height);

@@ -6,11 +6,11 @@ namespace SnakeCore;
 
 public class Playground : IRenderable, ICollidable
 {
-    public Playground()
+    public Playground(int width = 700, int height = 700)
     {
-        DesignHeight = 700;
+        DesignHeight = height;
         Height = 70;
-        DesignWidth = 700;
+        DesignWidth = width;
         Width = 70;
         tileSize = new Vector2(DesignWidth / Width, DesignHeight / Height);
     }
