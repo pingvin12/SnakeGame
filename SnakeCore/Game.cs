@@ -1,11 +1,6 @@
 ﻿using StbImageSharp;
-using System.Buffers;
-using System.Diagnostics;
 using System.Drawing;
-using System.Net.Http.Headers;
 using System.Numerics;
-using System.Resources;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace SnakeCore;
 
@@ -49,18 +44,6 @@ public class Game
     private Vector2 _removedTail1;
     private Vector2 _removedTail2;
 
-    /// <summary>
-    /// TODO: Find better name
-    /// Width of the map in cells
-    /// </summary>
-    private int Width { get; set; } = 10;
-
-    /// <summary>
-    /// TODO: Find better name
-    /// Height of the map in cells
-    /// </summary>
-    private int Height { get; set; } = 10;
-
     public int Points { get; protected set; }
 
     public bool IsDead { get; protected set; }
@@ -75,12 +58,12 @@ public class Game
 
     private ImageHandle? _eatImage;
     private ImageHandle? _cellImage;
+    private Playground playground;
 
-    public int DesignWidth { get; } = 700;
-
-    public int DesignHeight { get; } = 700;
-
-    public Game() { }
+    public Game()
+    {
+        playground = new Playground();
+    }
 
     /// <summary>
     /// Resets the game. 
@@ -98,8 +81,8 @@ public class Game
 
         var cellImage = ImageResult.FromMemory(Resource.px_cell, ColorComponents.RedGreenBlueAlpha);
         _cellImage = renderer.CreateImage(1, 1, cellImage.Data);
-
-        var center = new Vector2(Width / 2, Height / 2);
+        playground.Initialize(renderer);
+        var center = new Vector2(playground.Width / 2, playground.Height / 2);
         center = new Vector2(4, center.Y);
 
         _snake.Clear();
@@ -177,8 +160,8 @@ public class Game
                     break;
                 }
             }
-            if(nextHead.X < 0 || nextHead.X > Width - 1 || nextHead.Y < 0 || nextHead.Y > Height - 1
-               || isDead)
+            
+            if(playground.IsColliding(nextHead) || isDead)
             {
                 _snake.RemoveAt(0);
                 _snake.Add(_removedTail1);
@@ -272,22 +255,6 @@ public class Game
         }
     }
 
-    void WaitingForMenu(float elapsedSeconds, Direction direction)
-    {
-        _waitingMenuRemaining = Math.Clamp(_waitingMenuRemaining - elapsedSeconds, 0, 1);
-        var menuT = _waitingMenuRemaining / _waitingMenuStart;
-
-        var tailDirection = _snake[^2] - _snake[^1];
-        var tailT2 = Math.Clamp(1 - (_waitingMenuStart - _waitingMenuRemaining) / (1F / Speed), 0, 1);
-
-        _tailOffset = Vector2.Lerp(tailDirection / 2, tailDirection, tailT2);
-    }
-
-    void Nothing(float elapsedSeconds, Direction direction)
-    {
-        ;
-    }
-
     void ChangeState(StateUpdate update)
     {
         _stateUpdate = update;
@@ -300,47 +267,34 @@ public class Game
 
     public void Draw(float elapsedSeconds, IRenderer renderer)
     {
-        // WATCH OUT FOR DRAW ORDER!
-
-        var tileSize = new Vector2(DesignWidth / Width, DesignHeight / Height);
-        for(var x = 0; x < Width; x++)
-        {
-            for(var y = 0; y < Height; y++)
-            {
-                var lightGreen = Color.FromArgb(162, 209, 73);
-                var darkGreen = Color.FromArgb(170, 215, 81);
-                var color = (x + y) % 2 == 0 ? lightGreen : darkGreen;
-
-                renderer.DrawImage(_cellImage, new Vector2(x, y) * tileSize, tileSize, 0, Vector2.Zero, color);
-            }
-        }
+        playground.Draw(renderer);
 
         var snake = _snake;
         var snakeColor = Color.FromArgb(78, 124, 246);
 
         var head = snake[0];
 
-        var headFinal = Vector2.Clamp(head + _snakeHeadOffset, new Vector2(0, 0), new Vector2(Width - 1, Height - 1)) * tileSize;
+        var headFinal = Vector2.Clamp(head + _snakeHeadOffset, new Vector2(0, 0), new Vector2(playground.Width - 1, playground.Height - 1)) * playground.TileSize;
         var headRotation = MathF.Atan2(_snakeHeadRotation.Y, _snakeHeadRotation.X);
 
-        var tailFinal = (snake[^1] + _tailOffset) * tileSize;
-        renderer.DrawImage(_cellImage, tailFinal, tileSize, 0, Vector2.Zero, snakeColor.Dark(0.04f * snake.Count));
+        var tailFinal = (snake[^1] + _tailOffset) * playground.TileSize;
+        renderer.DrawImage(_cellImage, tailFinal, playground.TileSize, 0, Vector2.Zero, snakeColor.Dark(0.04f * snake.Count));
 
         for (var i = 0; i < snake.Count - 1; i++)
         {
             var body = snake[i];
-            renderer.DrawImage(_cellImage, body * tileSize, tileSize, 0, Vector2.Zero, snakeColor.Dark(0.04f * i));
+            renderer.DrawImage(_cellImage, body * playground.TileSize, playground.TileSize, 0, Vector2.Zero, snakeColor.Dark(0.04f * i));
         }
 
         var direction = _currDirection.ToVector2();
-        var neckFinal = Vector2.Lerp(head, head + direction, _t) * tileSize;
-        renderer.DrawImage(_cellImage, neckFinal, tileSize, 0, Vector2.Zero, snakeColor);
-        renderer.DrawImage(_cellImage, headFinal, tileSize, 0, Vector2.Zero, snakeColor);
+        var neckFinal = Vector2.Lerp(head, head + direction, _t) * playground.TileSize;
+        renderer.DrawImage(_cellImage, neckFinal, playground.TileSize, 0, Vector2.Zero, snakeColor);
+        renderer.DrawImage(_cellImage, headFinal, playground.TileSize, 0, Vector2.Zero, snakeColor);
 
-        var eyeSize = tileSize / 2.5F;
+        var eyeSize = playground.TileSize / 2.5F;
         var eyeRotation = headRotation;
-        var eyePosition1 = Vector2.Transform(Vector2.Zero, Matrix3x2.CreateRotation(eyeRotation, tileSize / 2)) + headFinal;
-        var eyePosition2 = Vector2.Transform(new Vector2(0, tileSize.Y - eyeSize.Y), Matrix3x2.CreateRotation(eyeRotation, tileSize / 2)) + headFinal;
+        var eyePosition1 = Vector2.Transform(Vector2.Zero, Matrix3x2.CreateRotation(eyeRotation, playground.TileSize / 2)) + headFinal;
+        var eyePosition2 = Vector2.Transform(new Vector2(0, playground.TileSize.Y - eyeSize.Y), Matrix3x2.CreateRotation(eyeRotation, playground.TileSize / 2)) + headFinal;
 
         renderer.DrawImage(_eyeImage, eyePosition1, eyeSize, eyeRotation, Vector2.Zero, new Rectangle(20, 20, 40, 40), Color.White);
         renderer.DrawImage(_eyeImage, eyePosition2, eyeSize, eyeRotation, Vector2.Zero, new Rectangle(20, 20, 40, 40), Color.White);
