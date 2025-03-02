@@ -1,215 +1,215 @@
-﻿using System.Drawing;
+﻿using StbImageSharp;
+using System.Buffers;
+using System.Diagnostics;
+using System.Drawing;
+using System.Net.Http.Headers;
 using System.Numerics;
+using System.Resources;
+using static System.Formats.Asn1.AsnWriter;
 
-namespace SnakeCore
+namespace SnakeCore;
+
+public delegate void StateUpdate(float elapsedSeconds, Direction direction);
+
+public class Game
 {
-    public delegate void StateUpdate(float elapsedSeconds, Direction direction);
+    // Fields for the snake movement
+    private readonly List<Vector2> _snake = new List<Vector2>();
+    private bool _waitingForFirstInput = true;
+    private float _t;
 
-    public class Game
+    private Direction _currDirection = Direction.None;
+    private List<Direction> _nextDirections = new();
+
+    //private Direction _currDirection = Direction.None;
+    //private Direction _nextDirection = Direction.None;
+
+    // Fields for the snake drawing
+    private Vector2 _snakeHeadOffset = Vector2.Zero;
+    private Vector2 _snakeHeadRotation;
+    private Vector2 _tailOffset = Vector2.Zero;
+    private Vector2 _shakeOffset = Vector2.Zero;
+
+
+    private readonly float _shakeDurationStart = .16f;
+    private float _shakeDurationRemaining = .16f;
+
+    private readonly float _goingBackStart1 = .18f;
+    private float _goingBackRemaining1 = .18f;
+
+    private readonly float _goingBackStart2 = .06f;
+    private float _goingBackRemaining2 = .06f;
+
+    private readonly float _waitingMenuStart = 1.1f;
+    private float _waitingMenuRemaining = 1.1f;
+
+    private Direction _lastDirection1 = Direction.None;
+    private Direction _lastDirection2 = Direction.None;
+
+    private Vector2 _removedTail1;
+    private Vector2 _removedTail2;
+
+    /// <summary>
+    /// TODO: Find better name
+    /// Width of the map in cells
+    /// </summary>
+    private int Width { get; set; } = 10;
+
+    /// <summary>
+    /// TODO: Find better name
+    /// Height of the map in cells
+    /// </summary>
+    private int Height { get; set; } = 10;
+
+    public int Points { get; protected set; }
+
+    public bool IsDead { get; protected set; }
+
+    public float Speed { get; set; } = 5;
+
+    private StateUpdate? _stateUpdate;
+
+    private ImageHandle? _eyeImage;
+    private Rectangle _eyeAnimation1;
+    private Rectangle _eyeAnimation2;
+
+    private ImageHandle? _eatImage;
+    private ImageHandle? _cellImage;
+
+    public int DesignWidth { get; } = 700;
+
+    public int DesignHeight { get; } = 700;
+
+    public Game() { }
+
+    /// <summary>
+    /// Resets the game. 
+    /// </summary>
+    public void Initialize(IRenderer renderer)
     {
-        // Fields for the snake movement
-        private readonly List<Vector2> _snake = new List<Vector2>();
-        private bool _waitingForFirstInput = true;
-        private float _t = -.5f;
-        private List<Direction> _directions = new();
+        var eyeImage = ImageResult.FromMemory(Resource.px_blink, ColorComponents.RedGreenBlueAlpha);
+        _eyeImage = renderer.CreateImage(eyeImage.Width, eyeImage.Height, eyeImage.Data);
 
-        // Fields for the snake drawing
-        private Vector2[] _snakeHead = Array.Empty<Vector2>();
-        private Vector2 _snakeHeadOffset = Vector2.Zero;
-        private Vector2 _snakeHeadRotation;
-        private Color _snakeColor = Color.FromArgb(78, 124, 246);
-        private Vector2 _tailOffset = Vector2.Zero;
-        private Vector2 _shakeOffset = Vector2.Zero;
+        _eyeAnimation1 = new Rectangle(20, 20, 40, 40);
+        _eyeAnimation2 = new Rectangle(20, 260, 40, 40);
 
+        var eatImage = ImageResult.FromMemory(Resource.px_eat, ColorComponents.RedGreenBlueAlpha);
+        _eatImage = renderer.CreateImage(eatImage.Width, eatImage.Height, eatImage.Data);
 
-        private readonly float _shakeDurationStart = .15f;
-        private float _shakeDurationRemaining = .15f;
+        var cellImage = ImageResult.FromMemory(Resource.px_cell, ColorComponents.RedGreenBlueAlpha);
+        _cellImage = renderer.CreateImage(1, 1, cellImage.Data);
 
-        private readonly float _goingBackStart = .1f;
-        private float _goingBackRemaining = .1f;
+        var center = new Vector2(Width / 2, Height / 2);
+        center = new Vector2(4, center.Y);
 
-        private readonly float _waitingMenuStart = 1.1f;
-        private float _waitingMenuRemaining = 1.1f;
+        _snake.Clear();
+        _snake.Add(center);
+        _snake.Add(center + new Vector2(-1, 0));
+        _snake.Add(center + new Vector2(-2, 0));
 
-        private Vector2 _lastTail;
-        private Vector2 _prevLastTail;
-        private Vector2 _lastDirection;
-        
-        /// <summary>
-        /// Width of the map
-        /// </summary>
-        public int Width { get; private set; }
+        _waitingForFirstInput = true;
+        _t = 0;
 
-        /// <summary>
-        /// Height of the map
-        /// </summary>
-        public int Height { get; private set; }
+        _currDirection = Direction.Right;
+        _nextDirections.Clear();
 
-        public int Points { get; protected set; }
+        _shakeDurationRemaining = _shakeDurationStart;
+        _goingBackRemaining1 = _goingBackStart1;
+        _goingBackRemaining2 = _goingBackStart2;
+        _waitingMenuRemaining = _waitingMenuStart;
 
-        public bool IsDead { get; protected set; }
+        IsDead = false;
+        Points = 0;
 
-        public float Speed { get; set; } = 7;
+        _stateUpdate = InGame;
+    }
 
-        private StateUpdate _stateUpdate;
-
-        /// <summary>
-        /// Creat the default game.
-        /// </summary>
-        /// <param name="width">The width of the map</param>
-        /// <param name="height">The height of the map</param>
-        public Game(int width = 13, int height = 10)
+    void InGame(float elapsedSeconds, Direction direction)
+    {
+        if(_waitingForFirstInput
+            && direction != Direction.None
+            && _currDirection.Inverse() != direction)
         {
-            Width = width;
-            Height = height;
+            _waitingForFirstInput = false;
+            _nextDirections.Add(direction);
         }
 
-        /// <summary>
-        /// Resets the game. 
-        /// </summary>
-        public void Initialize()
+        if(_waitingForFirstInput)
+            return;
+
+
+        if(direction != Direction.None && !_nextDirections.Contains(direction) && _nextDirections.LastOrDefault(_currDirection) != direction.Inverse())
         {
-            var center = new Vector2(Width / 2, Height / 2);
-            center = new Vector2(4, center.Y);
+            _nextDirections.Add(direction);
+        }
 
-            _snake.Clear();
-            _snake.Add(center);
-            _snake.Add(center + new Vector2(-1, 0));
-            _snake.Add(center + new Vector2(-2, 0));
+        _t += elapsedSeconds / (1F / Speed);
 
-            _waitingForFirstInput = true;
+        if(_t >= 1)
+        {
+            var newHead = _snake[0] + _currDirection.ToVector2();
+
+            _lastDirection2 = _lastDirection1;
+            _lastDirection1 = _currDirection;
+
+            var previousRemovedTail = _removedTail2;
+            _removedTail2 = _removedTail1;
+            _removedTail1 = _snake[^1];
+
+            if(_nextDirections.Count > 0) // If no user input keep the last.
+            {
+                _currDirection = _nextDirections[0];
+                _nextDirections.RemoveAt(0);
+            }
+
             _t = 0;
 
-            _directions.Clear();
-            _directions.Add(Direction.Right);
+            _snake.Insert(0, newHead);
+            _snake.RemoveAt(_snake.Count - 1);
 
-            _shakeDurationRemaining = _shakeDurationStart;
-            _goingBackRemaining = _goingBackStart;
-            _waitingMenuRemaining = _waitingMenuStart;
-
-            IsDead = false;
-            Points = 0;
-
-            _stateUpdate = AwaitStart;
-            InGame(0, Direction.None);
-        }
-
-        //public void Draw<TRenderer>(float elapsedSeconds, TRenderer effectRenderer) where TRenderer : IRenderer
-        public void Draw(float elapsedSeconds, IRenderer renderer)
-        {
-            var effectRenderer = new RendererWrapper(renderer, _shakeOffset); 
-
-            var block = GameData.Block;
-
-            for (var x = 0; x < Width; x++)
+            var nextHead = newHead + _currDirection.ToVector2();
+            var isDead = false;
+            for(var i = 1; i < _snake.Count; i++)
             {
-                for (var y = 0; y < Height; y++)
+                if(_snake[i] == nextHead)
                 {
-                    effectRenderer.DrawTriangle(
-                            block,
-                            0,
-                            new Vector2(x, y),
-                            (x + y) % 2 == 0 ? Color.FromArgb(162, 209, 73) : Color.FromArgb(170, 215, 81)
-                        );
+                    isDead = true;
+                    break;
                 }
             }
-
-            var direction = _directions.First().ToVector2();
-            var snakeColor = new HSLColor(_snakeColor);
-            var head = _snake[0];
-
-            var neckFinal = Vector2.Lerp(head, head + direction, _t);
-            effectRenderer.DrawTriangle(block, 0, neckFinal, snakeColor); // Draw neck
-
-            var tailFinal = _snake.Last() + _tailOffset;
-            var tailColor = snakeColor;
-            tailColor.Luminosity *= MathF.Pow(0.98f, _snake.Count);
-            effectRenderer.DrawTriangle(block, 0, tailFinal, tailColor); // Draw tailDirection
-
-            for (var i = 0; i < _snake.Count - 1; i++)
+            if(nextHead.X < 0 || nextHead.X > Width - 1 || nextHead.Y < 0 || nextHead.Y > Height - 1
+               || isDead)
             {
-                effectRenderer.DrawTriangle(block, 0, _snake[i], snakeColor);
-                snakeColor.Luminosity *= .98f;
+                _snake.RemoveAt(0);
+                _snake.Add(_removedTail1);
+
+                _removedTail1 = _removedTail2;
+                _removedTail2 = previousRemovedTail;
+
+                ChangeState(GoingBack);
+                return;
             }
-
-            var headVertices = _snakeHead;
-            var headFinal = Vector2.Clamp(head + _snakeHeadOffset, new Vector2(0, 0), new Vector2(Width - 1, Height - 1));
-
-            var headRotation = MathF.Atan2(_snakeHeadRotation.Y, _snakeHeadRotation.X);
-
-            effectRenderer.DrawTriangle(headVertices, headRotation, headFinal, _snakeColor);
-            effectRenderer.DrawTriangle(GameData.EyeOuter, headRotation, headFinal, Color.White);
-            effectRenderer.DrawTriangle(GameData.EyeInner, headRotation, headFinal, Color.Black);
         }
 
+        // Animation
+        var currDirection = _currDirection.ToVector2();
+        var nextDirection = (_nextDirections.Count > 0 ? _nextDirections[0] : _currDirection).ToVector2();
 
+        var p0 = currDirection / 2;
+        var p2 = currDirection + nextDirection / 2;
+        var p1 = currDirection;
 
-        void InGame(float elapsedSeconds, Direction direction)
-        {
-            if (direction != Direction.None
-                && direction.Inverse() != _directions.Last())
-            // && _directions.Count < 3) This looks bad its seems we need to replace the old ones with the new ones.
-            {
-                _directions.Add(direction);
-            }
+        var headOffset = Vector2Extensions.LerpQuadraticBezier(p0, p2, p1, _t);
 
-            _t += elapsedSeconds / (1F / Speed);
+        _snakeHeadOffset = headOffset;
+        _snakeHeadRotation = nextDirection;
 
-            // We moved one block
-            if (_t >= 1)
-            {
-                var newHead = _snake[0] + _directions.First().ToVector2();
+        _tailOffset = Vector2.Lerp(Vector2.Zero, _snake[^2] - _snake[^1], _t);
+    }
 
-                _prevLastTail = _lastTail;
-                _lastTail = _snake.Last();
-
-                _lastDirection = _directions.First().ToVector2();
-
-                if (_directions.Count > 1) // If no user input keep the last.
-                    _directions.RemoveAt(0);
-
-                _t = 0;
-
-                _snake.Insert(0, newHead);
-                _snake.RemoveAt(_snake.Count - 1);
-
-                var nextHead = newHead + _directions.First().ToVector2();
-                if (nextHead.X < 0 || nextHead.X > Width - 1 || nextHead.Y < 0 || nextHead.Y > Height - 1)
-                {
-                    var lastDirection = _directions[0];
-                    _directions.Clear();
-                    _directions.Add(lastDirection);
-
-                    ChangeState(Shake);
-                    goto updateAnimation;
-                    return;
-                }
-
-
-            }
-
-        updateAnimation:;
-
-            _snakeHead = GameData.Block;
-            
-
-            var currDirection = _directions[0].ToVector2();
-            var nextDirection = (_directions.Count > 1 ? _directions[1] : _directions[0]).ToVector2();
-
-            var p0 = currDirection / 2;
-            var p2 = currDirection + nextDirection / 2;
-            var p1 = p0 + currDirection / 2;
-
-            _snakeHeadOffset = Vector2Extensions.LerpQuadraticBezier(p0, p2, p1, _t);
-            _snakeHeadRotation = (_directions.Count > 1 ? _directions[1] : _directions[0]).ToVector2();
-
-            var tailDirection = _snake[^2] - _snake[^1];
-            _tailOffset = Vector2.Lerp(Vector2.Zero, tailDirection, _t);
-        }
-
-        
-
-        void Shake(float elapsedSeconds, Direction direction)
+    void GoingBack(float elapsedSeconds, Direction direction)
+    {
+        if(_shakeDurationRemaining > 0)
         {
             _shakeDurationRemaining -= elapsedSeconds;
 
@@ -217,106 +217,132 @@ namespace SnakeCore
             var yOffset = Random.Shared.NextSingle(-.1f, .1f);
             _shakeOffset = new Vector2(xOffset, yOffset);
 
-            if (_shakeDurationRemaining < 0)
+            if(_shakeDurationRemaining <= 0)
             {
-                //_shakeOffset = Vector2.Zero;
-                //_tailOffset = _snake[^2] - _snake[^1];
-
-                _snake.RemoveAt(0);
-                _snake.Add(_lastTail);
-
-                //_snakeHeadOffset = _lastDirection.ToVector2();
-
-                ChangeState(GoingBack);
-                GoingBack(0, Direction.None);
+                // Initialize next state
+                ;
             }
         }
-
-        
-
-        void GoingBack(float elapsedSeconds, Direction direction)
+        else if(_goingBackRemaining1 > 0)
         {
-            var xOffset = Random.Shared.NextSingle(-.1f, .1f);
-            var yOffset = Random.Shared.NextSingle(-.1f, .1f);
-            _shakeOffset = new Vector2(xOffset, yOffset);
+            _goingBackRemaining1 -= elapsedSeconds;
 
-            _goingBackRemaining =  Math.Clamp(_goingBackRemaining - elapsedSeconds, 0, 1);
-            var goingT = _goingBackRemaining / _goingBackStart;
+            var currDirection = _lastDirection1.ToVector2();
+            var p0 = currDirection / 2;
+            var p1 = currDirection;
+            var tailDirection = _snake[^1] - _snake[^2];
 
-            var tailDirection = _snake[^2] - _snake[^1];
-            _tailOffset = Vector2.Lerp(Vector2.Zero, tailDirection, goingT);
-            
-            _snakeHeadOffset = Vector2.Lerp(Vector2.Zero, _lastDirection, goingT);
+            _snakeHeadOffset = Vector2.Lerp(p0, p1, _goingBackRemaining1 / _goingBackStart1);
+            _tailOffset = -Vector2.Lerp(Vector2.Zero, tailDirection, _goingBackRemaining1 / _goingBackStart1);
 
-            if(goingT <= 0)
+            if(_goingBackRemaining1 <= 0)
             {
-                _snake.Add(_prevLastTail);
+                // Initialize next state
+                _snake.Add(_removedTail1);
 
-                var headDirection = _snake[0] - _snake[1];
-                _snakeHeadRotation = headDirection;
+                _snakeHeadRotation = _lastDirection1.ToVector2();
 
-                ChangeState(WaitingForMenu);
-                WaitingForMenu(0, Direction.None);
+                // Copied from the next state!
+                var tailDirection1 = _snake[^1] - _snake[^2];
+                _tailOffset = -Vector2.Lerp(tailDirection1 / 2, tailDirection1, _goingBackRemaining2 / _goingBackStart2);
             }
         }
-
-        void WaitingForMenu(float elapsedSeconds, Direction direction)
+        else if(_goingBackRemaining2 > 0)
         {
-            _waitingMenuRemaining = Math.Clamp(_waitingMenuRemaining - elapsedSeconds, 0, 1);
-            var menuT = _waitingMenuRemaining / _waitingMenuStart;
+            _goingBackRemaining2 -= elapsedSeconds;
 
-            var tailDirection = _snake[^2] - _snake[^1];
-            var tailT2 = Math.Clamp(1 - (_waitingMenuStart - _waitingMenuRemaining) / (1F / Speed), 0, 1);
+            var tailDirection = _snake[^1] - _snake[^2];
+            _tailOffset = -Vector2.Lerp(tailDirection / 2, tailDirection, _goingBackRemaining2 / _goingBackStart2);
 
-            _tailOffset = Vector2.Lerp(tailDirection / 2, tailDirection, tailT2);
-        }
-
-        void Nothing(float elapsedSeconds, Direction direction)
-        {
-            ;
-        }
-
-        void ChangeState(StateUpdate update)
-        {
-            _stateUpdate = update;
-        }
-
-        public void Update(float elapsedSeconds, Direction direction)
-        {
-            _stateUpdate(elapsedSeconds, direction);
-        }
-
-        void AwaitStart(float elapsedSeconds, Direction direction)
-        {
-            if (direction != Direction.None)
+            if(_goingBackRemaining2 <= 0)
             {
-                _directions.Add(direction);
-                _waitingForFirstInput = false;
+                // Initialize next state
+                ;
             }
+        }
+        else if(_waitingMenuRemaining > 0)
+        {
+            _waitingMenuRemaining -= elapsedSeconds;
 
-            if (!_waitingForFirstInput)
+            if(_waitingMenuRemaining <= 0)
             {
-                ChangeState(InGame);
+                // Initialize next state
+                ;
             }
         }
     }
 
-    struct RendererWrapper : IRenderer
+    void WaitingForMenu(float elapsedSeconds, Direction direction)
     {
-        private readonly IRenderer _renderer;
-        private readonly Vector2 _transitionOffset;
+        _waitingMenuRemaining = Math.Clamp(_waitingMenuRemaining - elapsedSeconds, 0, 1);
+        var menuT = _waitingMenuRemaining / _waitingMenuStart;
 
-        public RendererWrapper(IRenderer renderer, Vector2 transitionOffset)
+        var tailDirection = _snake[^2] - _snake[^1];
+        var tailT2 = Math.Clamp(1 - (_waitingMenuStart - _waitingMenuRemaining) / (1F / Speed), 0, 1);
+
+        _tailOffset = Vector2.Lerp(tailDirection / 2, tailDirection, tailT2);
+    }
+
+    void Nothing(float elapsedSeconds, Direction direction)
+    {
+        ;
+    }
+
+    void ChangeState(StateUpdate update)
+    {
+        _stateUpdate = update;
+    }
+
+    public void Update(float elapsedSeconds, Direction direction)
+    {
+        _stateUpdate!(elapsedSeconds, direction);
+    }
+
+    public void Draw(float elapsedSeconds, IRenderer renderer)
+    {
+        // WATCH OUT FOR DRAW ORDER!
+
+        var tileSize = new Vector2(DesignWidth / Width, DesignHeight / Height);
+        for(var x = 0; x < Width; x++)
         {
-            _renderer = renderer;
-            _transitionOffset = transitionOffset;
+            for(var y = 0; y < Height; y++)
+            {
+                var lightGreen = Color.FromArgb(162, 209, 73);
+                var darkGreen = Color.FromArgb(170, 215, 81);
+                var color = (x + y) % 2 == 0 ? lightGreen : darkGreen;
+
+                renderer.DrawImage(_cellImage, new Vector2(x, y) * tileSize, tileSize, 0, Vector2.Zero, color);
+            }
         }
 
-        public void DrawTriangle(ReadOnlySpan<Vector2> vertices, float rotation, Vector2 transition, Color color)
-        {
-            transition += _transitionOffset;
+        var snake = _snake;
+        var snakeColor = Color.FromArgb(78, 124, 246);
 
-            _renderer.DrawTriangle(vertices, rotation, transition, color);
+        var head = snake[0];
+
+        var headFinal = Vector2.Clamp(head + _snakeHeadOffset, new Vector2(0, 0), new Vector2(Width - 1, Height - 1)) * tileSize;
+        var headRotation = MathF.Atan2(_snakeHeadRotation.Y, _snakeHeadRotation.X);
+
+        var tailFinal = (snake[^1] + _tailOffset) * tileSize;
+        renderer.DrawImage(_cellImage, tailFinal, tileSize, 0, Vector2.Zero, snakeColor.Dark(0.04f * snake.Count));
+
+        for (var i = 0; i < snake.Count - 1; i++)
+        {
+            var body = snake[i];
+            renderer.DrawImage(_cellImage, body * tileSize, tileSize, 0, Vector2.Zero, snakeColor.Dark(0.04f * i));
         }
+
+        var direction = _currDirection.ToVector2();
+        var neckFinal = Vector2.Lerp(head, head + direction, _t) * tileSize;
+        renderer.DrawImage(_cellImage, neckFinal, tileSize, 0, Vector2.Zero, snakeColor);
+        renderer.DrawImage(_cellImage, headFinal, tileSize, 0, Vector2.Zero, snakeColor);
+
+        var eyeSize = tileSize / 2.5F;
+        var eyeRotation = headRotation;
+        var eyePosition1 = Vector2.Transform(Vector2.Zero, Matrix3x2.CreateRotation(eyeRotation, tileSize / 2)) + headFinal;
+        var eyePosition2 = Vector2.Transform(new Vector2(0, tileSize.Y - eyeSize.Y), Matrix3x2.CreateRotation(eyeRotation, tileSize / 2)) + headFinal;
+
+        renderer.DrawImage(_eyeImage, eyePosition1, eyeSize, eyeRotation, Vector2.Zero, new Rectangle(20, 20, 40, 40), Color.White);
+        renderer.DrawImage(_eyeImage, eyePosition2, eyeSize, eyeRotation, Vector2.Zero, new Rectangle(20, 20, 40, 40), Color.White);
     }
 }
