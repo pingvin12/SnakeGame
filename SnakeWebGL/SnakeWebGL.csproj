@@ -4,8 +4,7 @@
 	<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
 	<EmccFlags>-sFULL_ES2 -sFULL_ES3 -lopenal -lGL</EmccFlags>
-	
-	<!-- this is for the Microsoft.TypeScript.MSBuild package we need it for the intellisense only-->
+	  <!-- this is for the Microsoft.TypeScript.MSBuild package we need it for the intellisense only-->
 	<TypeScriptCompileBlocked>true</TypeScriptCompileBlocked>
   </PropertyGroup>
   

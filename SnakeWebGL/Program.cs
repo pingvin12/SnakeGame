@@ -6,6 +6,7 @@ using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Silk.NET.OpenGLES;
 using SnakeWebGL;
+using WebGL.Sample;
 
 [assembly: SupportedOSPlatform("browser")]
 [assembly: DisableRuntimeMarshalling]
@@ -120,7 +121,7 @@ public static class Program
         //_ = EGL.DestroySurface(display, surface);
         //_ = EGL.Terminate(display);
 
-        //TrampolineFuncs.ApplyWorkaroundFixingInvocations();
+        TrampolineFuncs.ApplyWorkaroundFixingInvocations();
         
         var gl = GL.GetApi(EGL.GetProcAddress);
         Interop.Initialize();
