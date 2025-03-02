@@ -90,7 +90,7 @@ public class Game
             _gameWidth = gameWidth;
             _gameHeight = gameHeight;
 
-            _buffer = new VertexPositionColorTexture[1024];
+            _buffer = new VertexPositionColorTexture[2000000];
             _textures = new Texture2D[_buffer.Length / 6];
 
             _shaderProgram = Gl.CreateProgram();
@@ -122,9 +122,9 @@ public class Game
             gl.ShaderSource(vertexShader, vertexSource);
             gl.CompileShader(vertexShader);
             var compileStatus = (SpecialNumbers)gl.GetShader(vertexShader, ShaderParameterName.CompileStatus);
-            if(compileStatus == SpecialNumbers.False)
+            if (compileStatus == SpecialNumbers.False)
                 throw new Exception($"Failed to compile the vertex shader.");
-            
+
             var fragmentSource =
                 """
                 #version 300 es
@@ -149,7 +149,7 @@ public class Game
             gl.ShaderSource(fragmentShader, fragmentSource);
             gl.CompileShader(fragmentShader);
             compileStatus = (SpecialNumbers)gl.GetShader(fragmentShader, ShaderParameterName.CompileStatus);
-            if(compileStatus == SpecialNumbers.False)
+            if (compileStatus == SpecialNumbers.False)
                 throw new Exception("Failed to compile the fragment shader.");
 
             gl.AttachShader(_shaderProgram, vertexShader);
@@ -195,7 +195,8 @@ public class Game
             Gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, data);
             //Gl.GenerateMipmap(TextureTarget.Texture2D);
 
-            return new Texture2D() {
+            return new Texture2D()
+            {
                 Handle = id,
                 Width = width,
                 Height = height,
@@ -329,7 +330,7 @@ public class Game
 
             // Create view matrix for camera
             var screenCenter = new Vector2(_gameWidth / 2f, _gameHeight / 2f);
-            
+
             var view = Matrix4x4.Identity;
             view = Matrix4x4.Multiply(view, Matrix4x4.CreateTranslation(screenCenter.X, screenCenter.Y, 0));
             view = Matrix4x4.Multiply(view, Matrix4x4.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0));
@@ -360,10 +361,10 @@ public class Game
 
             Texture2D curTexture = _textures[0];
             var offset = 0;
-            for(var i = 1; i < _texturesPosition; i++)
+            for (var i = 1; i < _texturesPosition; i++)
             {
                 var nextTexture = _textures[i];
-                if(curTexture != nextTexture)
+                if (curTexture != nextTexture)
                 {
                     Gl.BindTexture(TextureTarget.Texture2D, curTexture.Handle);
                     Gl.DrawArrays(GLEnum.Triangles, offset * 6, (uint)(i - offset) * 6);
@@ -373,7 +374,7 @@ public class Game
                 }
             }
 
-            if(offset != _texturesPosition)
+            if (offset != _texturesPosition)
             {
                 Gl.BindTexture(TextureTarget.Texture2D, curTexture.Handle);
                 Gl.DrawArrays(GLEnum.Triangles, offset * 6, (uint)(_texturesPosition - offset) * 6);
@@ -395,25 +396,23 @@ public class Game
         public Vector2 ScreenToWorld(Vector2 screenPosition)
         {
             var screenCenter = new Vector2(_gameWidth / 2f, _gameHeight / 2f);
-            
+
             var transform = Matrix4x4.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
                            Matrix4x4.CreateScale(_cameraZoom) *
                            Matrix4x4.CreateRotationZ(_cameraRotation) *
                            Matrix4x4.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
                            Matrix4x4.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
 
-            if (Matrix4x4.Invert(transform, out var inverse))
-            {
-                var pos = Vector3.Transform(new Vector3(screenPosition, 0), inverse);
-                return new Vector2(pos.X, pos.Y);
-            }
-            return screenPosition;
+            Matrix4x4.Invert(transform, out var inverse);
+
+            var pos = Vector3.Transform(new Vector3(screenPosition, 0), inverse);
+            return new Vector2(pos.X, pos.Y);
         }
 
         public Vector2 WorldToScreen(Vector2 worldPosition)
         {
             var screenCenter = new Vector2(_gameWidth / 2f, _gameHeight / 2f);
-            
+
             var transform = Matrix4x4.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
                            Matrix4x4.CreateScale(_cameraZoom) *
                            Matrix4x4.CreateRotationZ(_cameraRotation) *

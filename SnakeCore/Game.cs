@@ -76,6 +76,9 @@ public class Game
     /// </summary>
     public void Initialize(IRenderer renderer)
     {
+        var cellImage = ImageResult.FromMemory(Resource.px_cell, ColorComponents.RedGreenBlueAlpha);
+        _cellImage = renderer.CreateImage(1, 1, cellImage.Data);
+
         var eyeImage = ImageResult.FromMemory(Resource.px_blink, ColorComponents.RedGreenBlueAlpha);
         _eyeImage = renderer.CreateImage(eyeImage.Width, eyeImage.Height, eyeImage.Data);
 
@@ -85,8 +88,6 @@ public class Game
         var eatImage = ImageResult.FromMemory(Resource.px_eat, ColorComponents.RedGreenBlueAlpha);
         _eatImage = renderer.CreateImage(eatImage.Width, eatImage.Height, eatImage.Data);
 
-        var cellImage = ImageResult.FromMemory(Resource.px_cell, ColorComponents.RedGreenBlueAlpha);
-        _cellImage = renderer.CreateImage(1, 1, cellImage.Data);
         playground.Initialize(renderer);
         var center = new Vector2(playground.Width / 2, playground.Height / 2);
         center = new Vector2(4, center.Y);
