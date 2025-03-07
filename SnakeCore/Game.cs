@@ -63,7 +63,7 @@ public class Game
     public int DesignHeight => playground.DesignHeight;
 
     private Vector2 _cameraPosition;
-    private float _cameraZoom = 1.5f;
+    private float _cameraZoom = 2.0f;
     private readonly float _cameraSmoothing = 5.0f;
 
     public Game()
@@ -281,7 +281,7 @@ public class Game
         _cameraPosition = Vector2.Lerp(_cameraPosition, targetCameraPos, elapsedSeconds * _cameraSmoothing);
 
         renderer.SetCamera(
-            _cameraPosition + new Vector2(DesignWidth / 2, DesignHeight / 2), 
+            _cameraPosition, 
             0,
             _cameraZoom
         );
