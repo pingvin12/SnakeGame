@@ -1,7 +1,6 @@
 ﻿using Silk.NET.OpenGLES;
 using SnakeCore;
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -90,7 +89,7 @@ public class Game
             _gameWidth = gameWidth;
             _gameHeight = gameHeight;
 
-            _buffer = new VertexPositionColorTexture[2000000];
+            _buffer = new VertexPositionColorTexture[2048];
             _textures = new Texture2D[_buffer.Length / 6];
 
             _shaderProgram = Gl.CreateProgram();
@@ -187,16 +186,15 @@ public class Game
             Gl.ActiveTexture(TextureUnit.Texture0);
             Gl.BindTexture(TextureTarget.Texture2D, id);
 
+            Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            
             Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
 
             Gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, data);
-            //Gl.GenerateMipmap(TextureTarget.Texture2D);
 
-            return new Texture2D()
-            {
+            return new Texture2D() {
                 Handle = id,
                 Width = width,
                 Height = height,
