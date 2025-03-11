@@ -34,7 +34,7 @@ public class Game
     private Game(GL gl)
     {
         _game = new();
-        _renderer = new WebGlRenderer(gl, _game.DesignWidth, _game.DesignHeight);
+        _renderer = new WebGlRenderer(gl, _game.playground.DesignWidth, _game.playground.DesignHeight);
 
         _game.Initialize(_renderer);
     }
