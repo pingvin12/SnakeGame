@@ -1,38 +1,32 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using SnakeCore;
 
 namespace SnakeFNA
 {
-    internal class FNARenderer : SnakeCore.IRenderer
+    internal class FNARenderer : IRenderer<Texture2D>
     {
-        private bool beginCalled;
+        private bool _beginCalled;
         private readonly GraphicsDevice _graphicsDevice;
-        private readonly int _width;
-        private readonly int _height;
         private readonly BasicEffect _effect;
+        private SpriteBatch _spriteBatch;
+        private Vector2 _cameraPosition;
+        private float _cameraRotation;
+        private float _cameraZoom = 1.0f;
 
-        private VertexPositionColor[] _buffer;
-        private int _triangleCount = 0;
-        private int _cellSize;
-        private Rectangle _prevScissor;
-
-        public FNARenderer(GraphicsDevice graphicsDevice, int width, int height)
+        public FNARenderer(GraphicsDevice graphicsDevice)
         {
             _graphicsDevice = graphicsDevice;
-            _width = width;
-            _height = height;
-
-            _effect = new BasicEffect(graphicsDevice);
-            _buffer = new VertexPositionColor[4096 * 3];
-
-            _effect.VertexColorEnabled = true;
-            
-            RasterizerState.CullNone.ScissorTestEnable = true;
+            _effect = new BasicEffect(graphicsDevice) 
+            {
+                VertexColorEnabled = true,
+            };
+            _spriteBatch = new SpriteBatch(graphicsDevice);
         }
 
         public void Begin()
         {
-            if(beginCalled)
+            if(_beginCalled)
             {
                 throw new InvalidOperationException(
 					"Begin has been called before calling End" +
@@ -42,40 +36,31 @@ namespace SnakeFNA
 				);
             }
 
-            beginCalled = true;
-            _triangleCount = 0;
+            _beginCalled = true;
 
-            _graphicsDevice.RasterizerState = RasterizerState.CullNone;
-            _graphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
-
+            // Get screen center for zoom origin
             var viewport = _graphicsDevice.Viewport;
+            var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
 
-            _cellSize = Math.Min(viewport.Width, viewport.Height) / Math.Max(_width, _height);
-            _cellSize -= (_cellSize % 2);
+            // Create transform matrix for camera - order matters!
+            var transform = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *  // Move to origin
+                           Matrix.CreateScale(_cameraZoom) *                                  // Apply zoom
+                           Matrix.CreateRotationZ(_cameraRotation) *                         // Apply rotation
+                           Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *     // Move back
+                           Matrix.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0); // Apply camera position
 
-            var offsetY = (viewport.Height - _height * _cellSize) / 2 + _cellSize / 2;
-            var offsetX = (viewport.Width - _width * _cellSize) / 2 + _cellSize / 2;
-            var world = Matrix.Identity;
-            world *= Matrix.CreateTranslation(offsetX, offsetY, 0);
-
-            var gameWidth = _cellSize * _width;
-            var gameHeight = _cellSize * _height;
-
-            _prevScissor = _graphicsDevice.ScissorRectangle;
-            _graphicsDevice.ScissorRectangle = new Rectangle(offsetX - _cellSize / 2, offsetY - _cellSize / 2, gameWidth, gameHeight);
-
-            _effect.World = world;
-            _effect.Projection = Matrix.CreateOrthographicOffCenter(0f, viewport.Width, viewport.Height, 0f, 0f, 1f);
-            _effect.CurrentTechnique.Passes[0].Apply();
-
-            
-
-            
+            _spriteBatch.Begin(SpriteSortMode.Deferred,
+                BlendState.AlphaBlend,
+                SamplerState.LinearClamp,
+                DepthStencilState.Default,
+                RasterizerState.CullCounterClockwise,
+                null,
+                transform);
         }
 
         public void End()
         {
-            if (!beginCalled)
+            if (!_beginCalled)
             {
                 throw new InvalidOperationException(
                     "End was called, but Begin has not yet" +
@@ -83,45 +68,67 @@ namespace SnakeFNA
                     " successfully before you can call End."
                 );
             }
-            beginCalled = false;
 
-            
+            _beginCalled = false;
 
-            _graphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleList, _buffer, 0, _triangleCount);
-            _graphicsDevice.ScissorRectangle = _prevScissor;
+            _spriteBatch.End();
         }
 
-        public void DrawTriangle(ReadOnlySpan<System.Numerics.Vector2> vertices, float rotation, System.Numerics.Vector2 transition, System.Drawing.Color color)
+        public void DrawImage(Texture2D image, System.Numerics.Vector2 position, System.Numerics.Vector2 size, float rotation, System.Numerics.Vector2 origin, System.Drawing.Rectangle sourceRectangle, System.Drawing.Color color)
+        {   
+            var destinationRectangle = new Rectangle((int)position.X, (int)position.Y, (int)size.X, (int)size.Y);
+            var xnaSourceRectangle = new Rectangle(sourceRectangle.X, sourceRectangle.Y, sourceRectangle.Width, sourceRectangle.Height);
+            var xnaColor = Color.FromNonPremultiplied(color.R, color.G, color.B, color.A);
+            var xnaOrigin = new Vector2(origin.X, origin.Y);
+            //xnaOrigin = Vector2.Zero;
+            _spriteBatch.Draw(image, destinationRectangle, xnaSourceRectangle, xnaColor, rotation, xnaOrigin, SpriteEffects.None, 0);
+        }
+
+        public unsafe Texture2D CreateImage(int width, int height, ReadOnlySpan<byte> data)
         {
-            if(!beginCalled)
-            {
-                throw new InvalidOperationException(
-                    "DrawTriangle was called, but Begin has not yet" +
-                    " been called. You must call Begin" +
-                    " successfully before you can call DrawTriangle."
-                );
-            }
-                
-            // TODO: If we can implement hardware instancing all these matrix calculations can be moved into the GPU
-            var world = System.Numerics.Matrix3x2.Identity;
-            world *= System.Numerics.Matrix3x2.CreateScale(_cellSize / 2);
-            world *= System.Numerics.Matrix3x2.CreateRotation(rotation);
-            world *= System.Numerics.Matrix3x2.CreateTranslation(transition * _cellSize);
+            var texture = new Texture2D(_graphicsDevice, width, height, false, SurfaceFormat.Color);
+            fixed (byte* p = data) texture.SetDataPointerEXT(0, null, (nint)p, data.Length);
 
-            var start = _triangleCount * 3;
+            return texture;
+        }
 
-            for (var i = 0; i < vertices.Length; i++)
-            {
-                var vertex = System.Numerics.Vector2.Transform(vertices[i], world);
-                var newColor = new Color(color.R, color.G, color.B, color.A);
+        public void SetCamera(System.Numerics.Vector2 position, float rotation, float zoom)
+        {
+            _cameraPosition = new Vector2(position.X, position.Y);
+            _cameraRotation = rotation;
+            _cameraZoom = zoom;
+        }
 
-                _buffer[start].Position = new Vector3(vertex.X, vertex.Y, 0);
-                _buffer[start].Color = newColor;
-                
-                start++;
-            }
+        public System.Numerics.Vector2 ScreenToWorld(System.Numerics.Vector2 screenPosition)
+        {
+            var viewport = _graphicsDevice.Viewport;
+            var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
 
-            _triangleCount += vertices.Length / 3;
+            var matrix = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
+                        Matrix.CreateScale(_cameraZoom) *
+                        Matrix.CreateRotationZ(_cameraRotation) *
+                        Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
+                        Matrix.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
+            
+            matrix = Matrix.Invert(matrix);
+
+            var pos = Vector2.Transform(new Vector2(screenPosition.X, screenPosition.Y), matrix);
+            return new System.Numerics.Vector2(pos.X, pos.Y);
+        }
+
+        public System.Numerics.Vector2 WorldToScreen(System.Numerics.Vector2 worldPosition)
+        {
+            var viewport = _graphicsDevice.Viewport;
+            var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
+
+            var matrix = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *
+                        Matrix.CreateScale(_cameraZoom) *
+                        Matrix.CreateRotationZ(_cameraRotation) *
+                        Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *
+                        Matrix.CreateTranslation(_cameraPosition.X, _cameraPosition.Y, 0);
+
+            var pos = Vector2.Transform(new Vector2(worldPosition.X, worldPosition.Y), matrix);
+            return new System.Numerics.Vector2(pos.X, pos.Y);
         }
     }
 }

@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
-
 using Silk.NET.OpenGLES;
 using SnakeWebGL;
+using WebGL.Sample;
 
 [assembly: SupportedOSPlatform("browser")]
+[assembly: DisableRuntimeMarshalling]
 
-namespace WebGL.Sample;
+namespace SnakeWebGL;
 
-public static class Test
+public static class Program
 {
     private static Game? Game { get; set; }
 
@@ -56,21 +58,14 @@ public static class Test
         return 1; // The return value should be a bolean, false if the Frame is canceled and the animation should stop
     }
 
-    private static int CanvasWidth { get; set; }
-
-    private static int CanvasHeight { get; set; }
-
     public static void CanvasResized(int width, int height)
     {
-        CanvasWidth = width;
-        CanvasHeight = height;
-        Game?.CanvasResized(CanvasWidth, CanvasHeight);
-        //Demo?.CanvasResized(CanvasWidth, CanvasHeight);
+        Game?.CanvasResized(width, height);
     }
 
     public static void Main(string[] args)
     {
-        Console.WriteLine($"Hello from dotnet!");
+        Console.WriteLine($"Hello from dotnet 9!");
 
         var display = EGL.GetDisplay(IntPtr.Zero);
         if (display == IntPtr.Zero)
@@ -131,12 +126,13 @@ public static class Test
         var gl = GL.GetApi(EGL.GetProcAddress);
         Interop.Initialize();
 
-        Game = Game.Create(gl, CanvasWidth, CanvasHeight);
+
+        Game = Game.Create(gl);
 
         unsafe
         {
             // https://emscripten.org/docs/api_reference/html5.h.html?highlight=emscripten_request_animation_frame#c.emscripten_request_animation_frame_loop
-            Emscripten.RequestAnimationFrameLoop((delegate* unmanaged<double, int, int>)&Frame, 10);
+            Emscripten.RequestAnimationFrameLoop((delegate* unmanaged<double, int, int>)&Frame, nint.Zero);
         }
     }
 }
