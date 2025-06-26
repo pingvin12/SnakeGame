@@ -569,6 +569,14 @@ public class Game
                     continue;
                 }
                 var ch = _fontAtlas.Chars[c - firstChar];
+
+                // Skip drawing for space (ASCII 32)
+                if (c == (char)32)
+                {
+                    x += ch.xadvance;
+                    continue;
+                }
+
                 float x0 = x + ch.xoff;
                 float y0 = y + ch.yoff;
                 float x1 = x0 + (ch.x1 - ch.x0);

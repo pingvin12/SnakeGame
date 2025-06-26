@@ -147,9 +147,9 @@ public class Game
         // Draw point cubes
         foreach (var cube in _pointCubes)
             cube.Draw(renderer);
-        var unclampedScorePos = _cameraPosition + _playerSnake.HeadOffset + _playerSnake.ShakeOffset;
-        var scorePos = Vector2.Max(unclampedScorePos, Vector2.Zero);
-        renderer.DrawText($"Score: {Points}", scorePos);
+
+        Vector2 textPos = _playerSnake.Head - new Vector2(20, 10);
+        renderer.DrawText($"score {Points}", textPos);
 
         DrawSnake(_playerSnake, renderer);
         DrawSnake(_aiSnake, renderer);
