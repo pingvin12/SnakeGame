@@ -418,17 +418,17 @@ public class Game
             );
 
             vertices[0].Texture.X = sourceX;
-            vertices[0].Texture.Y = sourceH + sourceY;
+            vertices[0].Texture.Y = 1.0f - (sourceH + sourceY);
             vertices[1].Texture.X = sourceW + sourceX;
-            vertices[1].Texture.Y = sourceH + sourceY;
+            vertices[1].Texture.Y = 1.0f - (sourceH + sourceY);
             vertices[2].Texture.X = sourceX;
-            vertices[2].Texture.Y = sourceY;
+            vertices[2].Texture.Y = 1.0f - sourceY;
             vertices[3].Texture.X = sourceW + sourceX;
-            vertices[3].Texture.Y = sourceH + sourceY;
+            vertices[3].Texture.Y = 1.0f - (sourceH + sourceY);
             vertices[4].Texture.X = sourceW + sourceX;
-            vertices[4].Texture.Y = sourceY;
+            vertices[4].Texture.Y = 1.0f - sourceY;
             vertices[5].Texture.X = sourceX;
-            vertices[5].Texture.Y = sourceY;
+            vertices[5].Texture.Y = 1.0f - sourceY;
 
             var colorF = new Vector3(color.R / 255f, color.G / 255f, color.B / 255f);
             vertices[0].Color = colorF;
@@ -574,7 +574,8 @@ public class Game
                 float x1 = x0 + (ch.x1 - ch.x0);
                 float y1 = y0 + (ch.y1 - ch.y0);
 
-                var srcRect = new System.Drawing.Rectangle((int)ch.x0, (int)ch.y0, (int)(ch.x1 - ch.x0), (int)(ch.y1 - ch.y0));
+                var flippedY = _fontAtlas.AtlasHeight - (int)ch.y1;
+                var srcRect = new Rectangle((int)ch.x0, flippedY, (int)(ch.x1 - ch.x0), (int)(ch.y1 - ch.y0));
                 var destPos = new Vector2(x0, y0);
                 var size = new Vector2(x1 - x0, y1 - y0);
                 DrawImage(_fontAtlas.Texture, destPos, size, 0, Vector2.Zero, srcRect, color);
