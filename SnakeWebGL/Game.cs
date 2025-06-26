@@ -5,6 +5,10 @@ using System.Drawing;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using StbTrueTypeSharp;
+using System.IO;
+using System.Linq;
+using System.Drawing.Imaging;
 
 [assembly: SupportedOSPlatform("browser")]
 
@@ -30,6 +34,70 @@ public class Game
     private WebGlRenderer _renderer;
     private SnakeCore.Game _game;
 
+    private class FontAtlas
+    {
+        public Texture2D Texture;
+        public int AtlasWidth;
+        public int AtlasHeight;
+        public StbTrueTypeSharp.StbTrueType.stbtt_packedchar[] Chars;
+        public float FontSize;
+    }
+
+    private FontAtlas _fontAtlas;
+
+    private void EnsureFontAtlas()
+    {
+        if (_fontAtlas != null)
+            return;
+
+        // Load TTF font bytes
+        var fontPath = Path.Combine("SnakeCore", "Resources", "ARCADECLASSIC.TTF");
+        byte[] fontData = File.ReadAllBytes(fontPath);
+
+        // Font settings
+        float fontSize = 12f;
+        int firstChar = 32;
+        int numChars = 95; // ASCII 32-126
+        int atlasWidth = 512;
+        int atlasHeight = 64;
+
+        var chars = new StbTrueTypeSharp.StbTrueType.stbtt_packedchar[numChars];
+        var atlasBitmap = new byte[atlasWidth * atlasHeight];
+
+        unsafe
+        {
+            fixed (byte* fontPtr = fontData)
+            fixed (byte* atlasPtr = atlasBitmap)
+            fixed (StbTrueTypeSharp.StbTrueType.stbtt_packedchar* charsPtr = chars)
+            {
+                StbTrueTypeSharp.StbTrueType.stbtt_pack_context context = new();
+                StbTrueTypeSharp.StbTrueType.stbtt_PackBegin(context, atlasPtr, atlasWidth, atlasHeight, 0, 1, null);
+                StbTrueTypeSharp.StbTrueType.stbtt_PackFontRange(context, fontPtr, 0, fontSize, firstChar, numChars, charsPtr);
+                StbTrueTypeSharp.StbTrueType.stbtt_PackEnd(context);
+            }
+        }
+
+        // Convert 8-bit alpha to RGBA
+        byte[] rgba = new byte[atlasWidth * atlasHeight * 4];
+        for (int i = 0; i < atlasWidth * atlasHeight; i++)
+        {
+            byte a = atlasBitmap[i];
+            rgba[i * 4 + 0] = 255;
+            rgba[i * 4 + 1] = 255;
+            rgba[i * 4 + 2] = 255;
+            rgba[i * 4 + 3] = a;
+        }
+
+        var tex = ((IRenderer<Texture2D>)this).CreateImage(atlasWidth, atlasHeight, rgba);
+        _fontAtlas = new FontAtlas
+        {
+            Texture = tex,
+            AtlasWidth = atlasWidth,
+            AtlasHeight = atlasHeight,
+            Chars = chars,
+            FontSize = fontSize
+        };
+    }
 
     private Game(GL gl)
     {
@@ -82,6 +150,67 @@ public class Game
         private Vector2 _cameraPosition;
         private float _cameraRotation;
         private float _cameraZoom = 1.0f;
+
+        // Font rendering fields
+        private class FontAtlas
+        {
+            public Texture2D Texture;
+            public int AtlasWidth;
+            public int AtlasHeight;
+            public StbTrueTypeSharp.StbTrueType.stbtt_packedchar[] Chars;
+            public float FontSize;
+        }
+        private FontAtlas _fontAtlas;
+        private void EnsureFontAtlas()
+        {
+            if (_fontAtlas != null)
+                return;
+
+
+            // Font settings
+            float fontSize = 12f;
+            int firstChar = 32;
+            int numChars = 95; // ASCII 32-126
+            int atlasWidth = 512;
+            int atlasHeight = 64;
+
+            var chars = new StbTrueTypeSharp.StbTrueType.stbtt_packedchar[numChars];
+            var atlasBitmap = new byte[atlasWidth * atlasHeight];
+
+            unsafe
+            {
+                fixed (byte* fontPtr = SnakeCore.Resource.font)
+                fixed (byte* atlasPtr = atlasBitmap)
+                fixed (StbTrueTypeSharp.StbTrueType.stbtt_packedchar* charsPtr = chars)
+                {
+                    StbTrueTypeSharp.StbTrueType.stbtt_pack_context context = new();
+                    StbTrueTypeSharp.StbTrueType.stbtt_PackBegin(context, atlasPtr, atlasWidth, atlasHeight, 0, 1, null);
+                    StbTrueTypeSharp.StbTrueType.stbtt_PackFontRange(context, fontPtr, 0, fontSize, firstChar, numChars, charsPtr);
+                    StbTrueTypeSharp.StbTrueType.stbtt_PackEnd(context);
+                }
+            }
+
+            // Convert 8-bit alpha to RGBA
+            byte[] rgba = new byte[atlasWidth * atlasHeight * 4];
+            for (int i = 0; i < atlasWidth * atlasHeight; i++)
+            {
+                byte a = atlasBitmap[i];
+                rgba[i * 4 + 0] = 255;
+                rgba[i * 4 + 1] = 255;
+                rgba[i * 4 + 2] = 255;
+                rgba[i * 4 + 3] = a;
+            }
+
+            var tex = ((IRenderer<Texture2D>)this).CreateImage(atlasWidth, atlasHeight, rgba);
+            _fontAtlas = new FontAtlas
+            {
+                Texture = tex,
+                AtlasWidth = atlasWidth,
+                AtlasHeight = atlasHeight,
+                Chars = chars,
+                FontSize = fontSize
+            };
+        }
 
         public unsafe WebGlRenderer(GL gl, int gameWidth, int gameHeight)
         {
@@ -419,6 +548,38 @@ public class Game
 
             var pos = Vector3.Transform(new Vector3(worldPosition, 0), transform);
             return new Vector2(pos.X, pos.Y);
+        }
+
+        public unsafe void DrawText(string text, Vector2 position)
+        {
+            EnsureFontAtlas();
+            if (_fontAtlas == null) return;
+
+            float x = position.X;
+            float y = position.Y;
+            int firstChar = 32;
+            var color = System.Drawing.Color.White;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c < firstChar || c >= firstChar + _fontAtlas.Chars.Length)
+                {
+                    x += _fontAtlas.FontSize / 2; // skip unknown chars
+                    continue;
+                }
+                var ch = _fontAtlas.Chars[c - firstChar];
+                float x0 = x + ch.xoff;
+                float y0 = y + ch.yoff;
+                float x1 = x0 + (ch.x1 - ch.x0);
+                float y1 = y0 + (ch.y1 - ch.y0);
+
+                var srcRect = new System.Drawing.Rectangle((int)ch.x0, (int)ch.y0, (int)(ch.x1 - ch.x0), (int)(ch.y1 - ch.y0));
+                var destPos = new Vector2(x0, y0);
+                var size = new Vector2(x1 - x0, y1 - y0);
+                DrawImage(_fontAtlas.Texture, destPos, size, 0, Vector2.Zero, srcRect, color);
+                x += ch.xadvance;
+            }
         }
     }
 }

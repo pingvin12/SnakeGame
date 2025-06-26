@@ -48,6 +48,7 @@
 	  <PrivateAssets>all</PrivateAssets>
 	  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	</PackageReference>
+	<PackageReference Include="StbTrueTypeSharp" Version="1.26.12" />
 	<ProjectReference Include="..\SnakeCore\SnakeCore.csproj" />
   </ItemGroup>
 </Project>

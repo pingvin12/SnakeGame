@@ -130,5 +130,10 @@ namespace SnakeFNA
             var pos = Vector2.Transform(new Vector2(worldPosition.X, worldPosition.Y), matrix);
             return new System.Numerics.Vector2(pos.X, pos.Y);
         }
+
+        public void DrawText(string text, System.Numerics.Vector2 position)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
