@@ -3,6 +3,7 @@ using StbImageSharp;
 using System.Drawing;
 using System.Numerics;
 using SnakeCore.AI;
+using SnakeCore.Entities.Food;
 
 namespace SnakeCore;
 
@@ -24,6 +25,10 @@ public class Game
     public float Speed { get; set; } = 5;
     public int Points { get; protected set; }
     public bool IsDead => _playerSnake.IsDead;
+
+    private List<PointCube> _pointCubes = new();
+    private static readonly int PointCubeCount = 3;
+    private static readonly Random _random = new();
 
     public Game()
     {
@@ -52,16 +57,30 @@ public class Game
         _aiSnake.Initialize(aiStart);
 
         Points = 0;
+        _pointCubes.Clear();
+        // Spawn point cubes at random positions not occupied by snakes
+        var occupied = new HashSet<Vector2>(_playerSnake.Segments.Concat(_aiSnake.Segments));
+        for (int i = 0; i < PointCubeCount; i++)
+        {
+            Vector2 pos;
+            do
+            {
+                pos = new Vector2(_random.Next(0, playground.Width), _random.Next(0, playground.Height));
+            } while (occupied.Contains(pos));
+            occupied.Add(pos);
+            _pointCubes.Add(new PointCube(pos));
+        }
     }
 
     public void Update(float elapsedSeconds, Direction direction)
     {
         _playerSnake.Update(elapsedSeconds, direction, Speed);
         CheckCollisions(_playerSnake);
-        
+        CheckPointCubeCollisions(_playerSnake);
 
         _aiSnake.Update(elapsedSeconds, Direction.None, Speed);
         CheckCollisions(_aiSnake);
+        CheckPointCubeCollisions(_aiSnake);
     }
 
     private void CheckCollisions(Snake snake)
@@ -89,12 +108,48 @@ public class Game
         return false;
     }
 
+    private void CheckPointCubeCollisions(Snake snake)
+    {
+        var nextHead = snake.Head + snake.CurrentDirection.ToVector2();
+        for (int i = _pointCubes.Count - 1; i >= 0; i--)
+        {
+            if (_pointCubes[i].IsColliding(nextHead))
+            {
+                _pointCubes.RemoveAt(i);
+                Points++;
+                // Optionally respawn a new point cube
+                SpawnPointCube();
+            }
+        }
+    }
+
+    private void SpawnPointCube()
+    {
+        // Avoid placing on snakes or existing cubes
+        var occupied = new HashSet<Vector2>(_playerSnake.Segments.Concat(_aiSnake.Segments).Concat(_pointCubes.Select(c => c.Position)));
+        Vector2 pos;
+        int tries = 0;
+        do
+        {
+            pos = new Vector2(_random.Next(0, playground.Width), _random.Next(0, playground.Height));
+            tries++;
+        } while (occupied.Contains(pos) && tries < 100);
+        if (!occupied.Contains(pos))
+            _pointCubes.Add(new PointCube(pos));
+    }
+
     public void Draw(float elapsedSeconds, IRenderer renderer)
     {
         UpdateCamera(elapsedSeconds);
         
         renderer.SetCamera(_cameraPosition, 0, _cameraZoom);
         playground.Draw(renderer);
+        // Draw point cubes
+        foreach (var cube in _pointCubes)
+            cube.Draw(renderer);
+        var unclampedScorePos = _cameraPosition + _playerSnake.HeadOffset + _playerSnake.ShakeOffset;
+        var scorePos = Vector2.Max(unclampedScorePos, Vector2.Zero);
+        renderer.DrawText($"Score: {Points}", scorePos);
 
         DrawSnake(_playerSnake, renderer);
         DrawSnake(_aiSnake, renderer);
