@@ -27,7 +27,7 @@ public class Game
     public bool IsDead => _playerSnake.IsDead;
 
     private List<PointCube> _pointCubes = new();
-    private static readonly int PointCubeCount = 3;
+    private static readonly int PointCubeCount = 100;
     private static readonly Random _random = new();
 
     public Game()
@@ -68,7 +68,9 @@ public class Game
                 pos = new Vector2(_random.Next(0, playground.Width), _random.Next(0, playground.Height));
             } while (occupied.Contains(pos));
             occupied.Add(pos);
-            _pointCubes.Add(new PointCube(pos));
+            var cube = new PointCube(pos);
+            cube.Initialize(renderer);
+            _pointCubes.Add(cube);
         }
     }
 
@@ -117,8 +119,6 @@ public class Game
             {
                 _pointCubes.RemoveAt(i);
                 Points++;
-                // Optionally respawn a new point cube
-                SpawnPointCube();
             }
         }
     }
@@ -135,7 +135,10 @@ public class Game
             tries++;
         } while (occupied.Contains(pos) && tries < 100);
         if (!occupied.Contains(pos))
-            _pointCubes.Add(new PointCube(pos));
+        {
+            var cube = new PointCube(pos);
+            _pointCubes.Add(cube);
+        }
     }
 
     public void Draw(float elapsedSeconds, IRenderer renderer)
