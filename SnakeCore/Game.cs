@@ -17,9 +17,10 @@ public class Game
     private ImageHandle? _eatImage;
     private ImageHandle? _cellImage;
     public Playground playground;
-    
+
+
     private Vector2 _cameraPosition;
-    private float _cameraZoom = 2.0f;
+    private float _cameraZoom;
     private readonly float _cameraSmoothing = 5.0f;
 
     public float Speed { get; set; } = 5;
@@ -39,6 +40,7 @@ public class Game
 
     public void Initialize(IRenderer renderer)
     {
+        _cameraZoom = renderer.Zoom;
         var cellImage = ImageResult.FromMemory(Resource.px_cell, ColorComponents.RedGreenBlueAlpha);
         _cellImage = renderer.CreateImage(1, 1, cellImage.Data);
 
@@ -145,7 +147,9 @@ public class Game
     {
         UpdateCamera(elapsedSeconds);
         
-        renderer.SetCamera(_cameraPosition, 0, _cameraZoom);
+        renderer.Position = _cameraPosition;
+        renderer.Rotation = 0;
+        renderer.Zoom = _cameraZoom;
         playground.Draw(renderer);
         // Draw point cubes
         foreach (var cube in _pointCubes)
