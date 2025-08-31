@@ -9,7 +9,8 @@ public class AISnake : Snake
     private readonly Playground _playground;
     private Direction _lastDirection = Direction.None;
     private float _thinkTime;
-    private const float THINK_INTERVAL = 0.1f;
+    private const float THINK_INTERVAL = 0.1f; 
+    private Random rnd = new Random();
 
     private static readonly Direction[] PossibleDirections = 
     {
@@ -19,11 +20,18 @@ public class AISnake : Snake
         Direction.Left
     };
 
-    public override Color Color => Color.FromArgb(246, 78, 78); // Red tint for AI snake
+    public override Color Color => AIColor;
+    public Color AIColor { get; set; }
+
+    public Color GetAISnakeColor()
+    {
+        return Color.FromArgb(rnd.Next(256), rnd.Next(256), rnd.Next(256));
+    }
 
     public AISnake(Vector2 startPosition, Playground playground) : base(startPosition)
     {
         _playground = playground;
+        AIColor = GetAISnakeColor();
     }
 
     public override void Update(float elapsedSeconds, Direction direction, float speed)
@@ -68,7 +76,7 @@ public class AISnake : Snake
 
         foreach (var dir in PossibleDirections)
         {
-            if (dir != Direction.None && dir != inverse && IsSafeMove(dir))
+            if (dir != inverse && IsSafeMove(dir))
             {
                 moves.Add(dir);
             }

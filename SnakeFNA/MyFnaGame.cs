@@ -50,14 +50,16 @@ namespace SnakeFNA
         {
             base.Initialize();
 
-            _graphics.ApplyChanges(); // By default the MSAA changes doesn't get aplied at startup.
+            _graphics.ApplyChanges(); // By default the MSAA changes doesn't get applied at startup.
 
             
         }
 
         protected override void LoadContent()
         {
-            _renderer = new FNARenderer(GraphicsDevice);
+            var designWidth = _game.playground.DesignWidth;
+            var designHeight = _game.playground.DesignHeight;
+            _renderer = new FNARenderer(GraphicsDevice, designWidth, designHeight);
             _game.Initialize(_renderer);
             base.LoadContent();
         }
@@ -75,11 +77,6 @@ namespace SnakeFNA
                 direction = SnakeCore.Direction.Down;
             else if (IsKeyPressed(Keys.A))
                 direction = SnakeCore.Direction.Left;
-            
-            //if(IsKeyPressed(Keys.Space))
-            //{
-            //    _game.Update(0.016f, SnakeCore.Direction.Up);
-            //}
 
             _game.Update((float)gameTime.ElapsedGameTime.TotalSeconds, direction);
             base.Update(gameTime);

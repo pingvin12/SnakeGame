@@ -6,7 +6,7 @@ namespace SnakeCore;
 
 public class Playground : IRenderable, ICollidable
 {
-    public Playground(int width = 100, int height = 100)
+    public Playground(int width = 400, int height = 400)
     {
         DesignHeight = height;
         Height = 70;

@@ -1,7 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using SnakeCore;
-using System.Drawing;
 
 namespace SnakeFNA
 {
@@ -16,6 +15,13 @@ namespace SnakeFNA
         public System.Numerics.Vector2 Position { get; set; }
         public float Rotation { get; set; }
         public float Zoom { get; set; } = 0.78f;
+        
+        // Global scale factor to make everything larger in FNA (scale viewport down)
+        private const float GLOBAL_SCALE = 0.9f;
+        
+        // Design size for camera logic
+        private readonly int _gameWidth;
+        private readonly int _gameHeight;
         
         private class FontAtlas
         {
@@ -77,9 +83,11 @@ namespace SnakeFNA
             };
         }
 
-        public FNARenderer(GraphicsDevice graphicsDevice)
+        public FNARenderer(GraphicsDevice graphicsDevice, int gameWidth, int gameHeight)
         {
             _graphicsDevice = graphicsDevice;
+            _gameWidth = gameWidth;
+            _gameHeight = gameHeight;
             _effect = new BasicEffect(graphicsDevice)
             {
                 VertexColorEnabled = true,
@@ -102,16 +110,20 @@ namespace SnakeFNA
             }
 
             _beginCalled = true;
-            // Get screen center for zoom origin
-            var viewport = _graphicsDevice.Viewport;
 
+            // Dynamic scaling: scale design area to fill window, then apply global scale
+            var viewport = _graphicsDevice.Viewport;
+            float scaleX = viewport.Width / (float)_gameWidth;
+            float scaleY = viewport.Height / (float)_gameHeight;
+            float scale = Math.Min(scaleX, scaleY) * GLOBAL_SCALE;
+            // Use viewport center so the scaled game area is always centered in the window
             var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
-            // Create transform matrix for camera - order matters!
-            var transform = Matrix.CreateTranslation(-screenCenter.X, -screenCenter.Y, 0) *  // Move to origin
-                           Matrix.CreateScale(Zoom) *                                  // Apply zoom
-                           Matrix.CreateRotationZ(Rotation) *                         // Apply rotation
-                           Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *     // Move back
-                           Matrix.CreateTranslation(Position.X, Position.Y, 0); // Apply camera position
+
+            var transform = Matrix.CreateTranslation(-_gameWidth / 2f, -_gameHeight / 2f, 0) *  // Move to design center
+                             Matrix.CreateScale(scale) *                                    // Dynamic + global scale
+                             Matrix.CreateRotationZ(Rotation) *                             // Apply rotation
+                             Matrix.CreateTranslation(screenCenter.X, screenCenter.Y, 0) *  // Move to window center
+                             Matrix.CreateTranslation(Position.X, Position.Y, 0);           // Apply camera position
 
             _spriteBatch.Begin(SpriteSortMode.Deferred,
                 BlendState.AlphaBlend,
@@ -140,11 +152,11 @@ namespace SnakeFNA
 
         public void DrawImage(Texture2D image, System.Numerics.Vector2 position, System.Numerics.Vector2 size, float rotation, System.Numerics.Vector2 origin, System.Drawing.Rectangle sourceRectangle, System.Drawing.Color color)
         {   
-            var destinationRectangle = new Microsoft.Xna.Framework.Rectangle((int)position.X, (int)position.Y, (int)size.X, (int)size.Y);
-            var xnaSourceRectangle = new Microsoft.Xna.Framework.Rectangle(sourceRectangle.X, sourceRectangle.Y, sourceRectangle.Width, sourceRectangle.Height);
-            var xnaColor = Microsoft.Xna.Framework.Color.FromNonPremultiplied(color.R, color.G, color.B, color.A);
+            var destinationRectangle = new Rectangle((int)position.X, (int)position.Y, (int)size.X, (int)size.Y);
+            var xnaSourceRectangle = new Rectangle(sourceRectangle.X, sourceRectangle.Y, sourceRectangle.Width, sourceRectangle.Height);
+            var xnaColor = Color.FromNonPremultiplied(color.R, color.G, color.B, color.A);
             var xnaOrigin = new Vector2(origin.X, origin.Y);
-            //xnaOrigin = Vector2.Zero;
+
             _spriteBatch.Draw(image, destinationRectangle, xnaSourceRectangle, xnaColor, rotation, xnaOrigin, SpriteEffects.None, 0);
         }
 

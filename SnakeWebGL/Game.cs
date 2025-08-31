@@ -3,10 +3,7 @@ using SnakeCore;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using StbTrueTypeSharp;
 using System.IO;
-using System.Linq;
-using System.Drawing.Imaging;
 
 [assembly: SupportedOSPlatform("browser")]
 

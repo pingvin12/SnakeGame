@@ -59,18 +59,14 @@ public class Game
         _aiSnake.Initialize(aiStart);
 
         Points = 0;
-        _pointCubes.Clear();
-        // Spawn point cubes at random positions not occupied by snakes
-        var occupied = new HashSet<Vector2>(_playerSnake.Segments.Concat(_aiSnake.Segments));
+        
+        // Spawn point cubes at random positions not occupied by snakes or other point cubes
+        
         for (int i = 0; i < PointCubeCount; i++)
         {
-            Vector2 pos;
-            do
-            {
-                pos = new Vector2(_random.Next(0, playground.Width), _random.Next(0, playground.Height));
-            } while (occupied.Contains(pos));
-            occupied.Add(pos);
-            var cube = new PointCube(pos);
+            Vector2 pos = new Vector2(_random.Next(0, playground.DesignWidth), _random.Next(0, playground.DesignHeight));
+            
+            var cube = new PointCube(new Vector2(playground.DesignWidth / playground.Width, playground.DesignHeight / playground.Height) / 1f, pos);
             cube.Initialize(renderer);
             _pointCubes.Add(cube);
         }
@@ -125,24 +121,6 @@ public class Game
         }
     }
 
-    private void SpawnPointCube()
-    {
-        // Avoid placing on snakes or existing cubes
-        var occupied = new HashSet<Vector2>(_playerSnake.Segments.Concat(_aiSnake.Segments).Concat(_pointCubes.Select(c => c.Position)));
-        Vector2 pos;
-        int tries = 0;
-        do
-        {
-            pos = new Vector2(_random.Next(0, playground.Width), _random.Next(0, playground.Height));
-            tries++;
-        } while (occupied.Contains(pos) && tries < 100);
-        if (!occupied.Contains(pos))
-        {
-            var cube = new PointCube(pos);
-            _pointCubes.Add(cube);
-        }
-    }
-
     public void Draw(float elapsedSeconds, IRenderer renderer)
     {
         UpdateCamera(elapsedSeconds);
@@ -155,7 +133,7 @@ public class Game
         foreach (var cube in _pointCubes)
             cube.Draw(renderer);
 
-        Vector2 textPos = _playerSnake.Head - new Vector2(20, 10);
+        var textPos = -(renderer.Position - new Vector2(-10, -20));
         renderer.DrawText($"score {Points}", textPos);
 
         DrawSnake(_playerSnake, renderer);
