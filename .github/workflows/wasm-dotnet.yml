@@ -51,7 +51,7 @@ jobs:
     - name: Deploy to S3
       uses: shallwefootball/s3-upload-action@master
       with:
-          aws_key_id: ${{ secrets.AWS_KEY_ID }}
+          aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
           aws_bucket: ${{ secrets.AWS_BUCKET }}
           source_dir: 'SnakeWebGL/bin/Release/net8.0/publish/wwwroot'
