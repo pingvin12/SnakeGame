@@ -4,6 +4,8 @@ using System.Drawing;
 using System.Numerics;
 using SnakeCore.AI;
 using SnakeCore.Entities.Food;
+using SnakeCore.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace SnakeCore;
 
@@ -11,8 +13,12 @@ public delegate void StateUpdate(float elapsedSeconds, Direction direction);
 
 public class Game
 {
+    private readonly ILogger _logger;
+
     private readonly Snake _playerSnake;
     private readonly Snake _aiSnake;
+
+
     private ImageHandle? _eyeImage;
     private ImageHandle? _eatImage;
     private ImageHandle? _cellImage;
@@ -31,8 +37,9 @@ public class Game
     private static readonly int PointCubeCount = 100;
     private static readonly Random _random = new();
 
-    public Game()
+    public Game(ILogger logger)
     {
+        _logger = logger;
         playground = new Playground();
         _playerSnake = new Snake(Vector2.Zero);
         _aiSnake = new AISnake(Vector2.Zero, playground);
@@ -51,21 +58,21 @@ public class Game
         _eatImage = renderer.CreateImage(eatImage.Width, eatImage.Height, eatImage.Data);
 
         playground.Initialize(renderer);
-        
+
         var playerStart = new Vector2(4, playground.Height / 2 - 2);
         _playerSnake.Initialize(playerStart);
-        
+
         var aiStart = new Vector2(4, playground.Height / 2 + 2);
         _aiSnake.Initialize(aiStart);
 
         Points = 0;
-        
+
         // Spawn point cubes at random positions not occupied by snakes or other point cubes
-        
+
         for (int i = 0; i < PointCubeCount; i++)
         {
             Vector2 pos = new Vector2(_random.Next(0, playground.DesignWidth), _random.Next(0, playground.DesignHeight));
-            
+
             var cube = new PointCube(new Vector2(playground.DesignWidth / playground.Width, playground.DesignHeight / playground.Height) / 1f, pos);
             cube.Initialize(renderer);
             _pointCubes.Add(cube);
@@ -86,25 +93,26 @@ public class Game
     private void CheckCollisions(Snake snake)
     {
         var nextHead = snake.Head + snake.CurrentDirection.ToVector2();
-            
-        if (playground.IsColliding(nextHead) || 
-            snake.IsColliding(Vector2.Zero) || 
+
+        if (playground.IsColliding(nextHead) ||
+            snake.IsColliding(Vector2.Zero) ||
             WillCollideWithOtherSnake(snake, nextHead))
         {
             snake.StartDeathAnimation();
+            _logger.LogInformation("Snake.Death", ("Snake.nextHead", nextHead));
         }
     }
 
     private bool WillCollideWithOtherSnake(Snake currentSnake, Vector2 position)
     {
         var otherSnake = currentSnake == _playerSnake ? _aiSnake : _playerSnake;
-        
+
         foreach (var segment in otherSnake.Segments)
         {
             if (segment == position)
                 return true;
         }
-        
+
         return false;
     }
 
@@ -117,6 +125,7 @@ public class Game
             {
                 _pointCubes.RemoveAt(i);
                 Points++;
+                _logger.LogInformation("Point.Collision", ("point.transform", _pointCubes[i].Position.ToString()), ("snake.transform", nextHead.ToString()));
             }
         }
     }
@@ -124,7 +133,7 @@ public class Game
     public void Draw(float elapsedSeconds, IRenderer renderer)
     {
         UpdateCamera(elapsedSeconds);
-        
+
         renderer.Position = _cameraPosition;
         renderer.Rotation = 0;
         renderer.Zoom = _cameraZoom;
@@ -146,7 +155,7 @@ public class Game
             _playerSnake.Head + _playerSnake.HeadOffset + _playerSnake.ShakeOffset,
             Vector2.Zero,
             new Vector2(playground.Width - 1, playground.Height - 1));
-            
+
         var targetCameraPos = -(headFinal * playground.TileSize);
         _cameraPosition = Vector2.Lerp(_cameraPosition, targetCameraPos, elapsedSeconds * _cameraSmoothing);
     }
@@ -167,7 +176,7 @@ public class Game
         var headFinal = (snake.Head + snake.HeadOffset + snake.ShakeOffset) * playground.TileSize;
         var direction = snake.CurrentDirection.ToVector2();
         var neckFinal = Vector2.Lerp(snake.Head, snake.Head + direction, snake.MoveProgress) * playground.TileSize;
-        
+
         renderer.DrawImage(_cellImage, neckFinal, playground.TileSize, 0, Vector2.Zero, snake.Color);
         renderer.DrawImage(_cellImage, headFinal, playground.TileSize, 0, Vector2.Zero, snake.Color);
 
@@ -178,7 +187,7 @@ public class Game
     {
         var eyeSize = playground.TileSize / 2.5F;
         var headRotation = MathF.Atan2(_playerSnake.HeadRotation.Y, _playerSnake.HeadRotation.X);
-        
+
         var eyePosition1 = Vector2.Transform(Vector2.Zero, Matrix3x2.CreateRotation(headRotation, playground.TileSize / 2)) + headFinal;
         var eyePosition2 = Vector2.Transform(new Vector2(0, playground.TileSize.Y - eyeSize.Y), Matrix3x2.CreateRotation(headRotation, playground.TileSize / 2)) + headFinal;
 

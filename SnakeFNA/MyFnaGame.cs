@@ -1,6 +1,8 @@
-﻿using Microsoft.Xna.Framework;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using SnakeCore.Logging;
 using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -29,7 +31,14 @@ namespace SnakeFNA
 
         private MyFnaGame()
         {
-            _game = new SnakeCore.Game();
+            var loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddProvider(new LokiLoggerProvider("http://localhost:3100/loki/api/v1/push")); // TODO, MOV TO CONFIG FILE
+                builder.SetMinimumLevel(LogLevel.Information);
+            });
+            var logger = loggerFactory.CreateLogger("SnakeGameFna");
+
+            _game = new SnakeCore.Game(logger);
             _graphics = new GraphicsDeviceManager(this)
             {
                 // We need this for anti aliasing to work

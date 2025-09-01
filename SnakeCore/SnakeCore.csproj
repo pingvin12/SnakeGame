@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>Library</OutputType>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Nullable>enable</Nullable>
@@ -25,7 +25,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="StbImageSharp" Version="2.27.13" />
+		<PackageReference Include="StbImageSharp" Version="2.30.15" />
 		<PackageReference Include="StbTrueTypeSharp" Version="1.26.12" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\SnakeCore.Logging\SnakeCore.Logging.csproj" />
 	</ItemGroup>
 </Project>

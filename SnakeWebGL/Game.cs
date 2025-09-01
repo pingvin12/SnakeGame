@@ -1,9 +1,11 @@
-﻿using Silk.NET.OpenGLES;
+﻿using Microsoft.Extensions.Logging;
+using Silk.NET.OpenGLES;
 using SnakeCore;
+using SnakeCore.Logging;
+using System.IO;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.IO;
 
 [assembly: SupportedOSPlatform("browser")]
 
@@ -96,7 +98,14 @@ public partial class Game
 
     private Game(GL gl)
     {
-        _game = new();
+        var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddProvider(new LokiLoggerProvider("http://localhost:3100/loki/api/v1/push"));// TODO, MOV TO CONFIG FILE
+            builder.SetMinimumLevel(LogLevel.Information);
+        });
+        var logger = loggerFactory.CreateLogger("SnakeGameWebGL");
+
+        _game = new(logger);
         _renderer = new WebGlRenderer(gl, _game.playground.DesignWidth, _game.playground.DesignHeight);
 
         _game.Initialize(_renderer);
