@@ -117,11 +117,11 @@ setModuleImports("main.js", {
         }
 
         var keyDown = (e: KeyboardEvent) => {
-            keyBoard.currKeys[e.code] = false;
+            keyBoard.currKeys[e.code] = true;
         };
 
         var keyUp = (e: KeyboardEvent) => {
-            keyBoard.currKeys[e.code] = true;
+            keyBoard.currKeys[e.code] = false;
         };
 
         var mouseMove = (e: MouseEvent) => {
@@ -133,7 +133,7 @@ setModuleImports("main.js", {
         };
 
         var mouseDown = (e: MouseEvent) => {
-            keyBoard.currKeys[`Mouse${e.button}`] = false;
+            keyBoard.currKeys[`Mouse${e.button}`] = true;
             const rect = canvas.getBoundingClientRect();
             const dpr = window.devicePixelRatio || 1;
             const x = (e.clientX - rect.left) * dpr;
@@ -142,7 +142,7 @@ setModuleImports("main.js", {
         };
 
         var mouseUp = (e: MouseEvent) => {
-            keyBoard.currKeys[`Mouse${e.button}`] = true;
+            keyBoard.currKeys[`Mouse${e.button}`] = false;
             const rect = canvas.getBoundingClientRect();
             const dpr = window.devicePixelRatio || 1;
             const x = (e.clientX - rect.left) * dpr;
@@ -164,7 +164,9 @@ setModuleImports("main.js", {
     },
 
     isKeyPressed: (key: string) => {
-        return !keyBoard.currKeys[key] && keyBoard.prevKeys[key];
+        const current = Boolean(keyBoard.currKeys[key]);
+        const previous = Boolean(keyBoard.prevKeys[key]);
+        return current && !previous;
     }
 });
 

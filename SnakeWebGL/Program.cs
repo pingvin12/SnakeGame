@@ -94,7 +94,17 @@ public static class Program
         Console.WriteLine($"[Startup] Canvas ready: {canvasReady}");
 
         var eglStartup = new EglStartup(new EglApi(), Console.WriteLine);
-        var eglHandles = eglStartup.Initialize();
+        EglHandles eglHandles;
+        try
+        {
+            eglHandles = eglStartup.Initialize();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Startup] EGL initialization failed: {ex}");
+            throw;
+        }
+
         Console.WriteLine($"[Startup] EGL handles display=0x{eglHandles.Display.ToInt64():X}, config=0x{eglHandles.Config.ToInt64():X}, context=0x{eglHandles.Context.ToInt64():X}, surface=0x{eglHandles.Surface.ToInt64():X} (v{eglHandles.MajorVersion}.{eglHandles.MinorVersion})");
 
         //_ = EGL.DestroyContext(display, context);

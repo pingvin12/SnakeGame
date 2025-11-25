@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Xunit;
 
 namespace SnakeWebGL.Tests;
@@ -92,5 +93,18 @@ public class EglStartupTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => startup.Initialize());
         Assert.Contains("0x3001", exception.Message);
+    }
+
+    [Fact]
+    public void DescribeAttributesTrimsTrailingComma()
+    {
+        // Use reflection to reach the private helper so we can lock in the string format that was failing.
+        var method = typeof(EglStartup).GetMethod("DescribeAttributes", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var attributes = new[] { EGL.EGL_RED_SIZE, 8, EGL.EGL_NONE, 0 };
+        var result = method!.Invoke(null, new object[] { attributes });
+
+        Assert.Equal("[12324=8]", result); // 12324 == EGL.EGL_RED_SIZE
     }
 }

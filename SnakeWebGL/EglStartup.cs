@@ -166,11 +166,11 @@ internal sealed class EglStartup
         writer.AppendLiteral("]");
 
         var result = writer.ToStringAndClear();
-        if (result == "["])
+        if (result == "[")
             return "[]";
 
-        if (result.EndsWith(", "))
-            result = result[..^2] + "]";
+        if (result.EndsWith(", ]"))
+            result = result[..^3] + "]";
 
         return result;
     }
