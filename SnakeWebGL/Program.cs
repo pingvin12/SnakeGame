@@ -134,7 +134,7 @@ public static class Program
 
         TrampolineFuncs.ApplyWorkaroundFixingInvocations();
         
-        var gl = eglActive ? GL.GetApi(EGL.GetProcAddress) : GL.GetApi();
+        var gl = GL.GetApi(EGL.GetProcAddress);
 
         Game = Game.Create(gl);
 
