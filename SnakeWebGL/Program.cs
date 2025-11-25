@@ -88,9 +88,12 @@ public static class Program
     {
         Console.WriteLine($"Hello from dotnet 9!");
 
+        // Ensure the JS side has already hooked up the canvas and input handlers before creating the GL context.
+        Interop.Initialize();
+
         var display = EGL.GetDisplay(IntPtr.Zero);
         if (display == IntPtr.Zero)
-            throw new Exception("Display was null");
+            throw new Exception("Display was null; ensure the canvas element is available and WebGL is enabled.");
 
         if (!EGL.Initialize(display, out int major, out int minor))
             throw new Exception("Initialize() returned false.");
@@ -145,8 +148,6 @@ public static class Program
         TrampolineFuncs.ApplyWorkaroundFixingInvocations();
         
         var gl = GL.GetApi(EGL.GetProcAddress);
-        Interop.Initialize();
-
 
         Game = Game.Create(gl);
 
