@@ -10,8 +10,32 @@ const config = getConfig();
 const exports = await getAssemblyExports(config.mainAssemblyName);
 const interop = exports.SnakeWebGL.Interop;
 
-var canvas = globalThis.document.getElementById("canvas") as HTMLCanvasElement;
+function domReady(): Promise<void> {
+    if (globalThis.document.readyState === "complete" || globalThis.document.readyState === "interactive") {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        globalThis.document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+    });
+}
+
+async function ensureCanvas(): Promise<HTMLCanvasElement> {
+    await domReady();
+
+    let canvas = globalThis.document.getElementById("canvas") as HTMLCanvasElement | null;
+    if (!canvas) {
+        canvas = globalThis.document.createElement("canvas") as HTMLCanvasElement;
+        canvas.id = "canvas";
+        globalThis.document.body.appendChild(canvas);
+    }
+
+    return canvas;
+}
+
+const canvas = await ensureCanvas();
 dotnet.instance.Module["canvas"] = canvas;
+interop?.OnCanvasResize(canvas.width, canvas.height);
 
 const keyBoard: { [key: string]: any } = {
     prevKeys: {},
