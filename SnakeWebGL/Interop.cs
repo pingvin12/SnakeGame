@@ -19,17 +19,19 @@ internal static partial class Interop
     [JSExport]
     public static void OnMouseMove(float x, float y)
     {
-
+        Program.OnMouseMove(x, y);
     }
 
     [JSExport]
-    public static void OnMouseDown(bool shift, bool ctrl, bool alt, int button)
+    public static void OnMouseDown(bool shift, bool ctrl, bool alt, int button, float x, float y)
     {
+        Program.OnMouseDown(button, x, y);
     }
 
     [JSExport]
-    public static void OnMouseUp(bool shift, bool ctrl, bool alt, int button)
+    public static void OnMouseUp(bool shift, bool ctrl, bool alt, int button, float x, float y)
     {
+        Program.OnMouseUp(button, x, y);
     }
 
     [JSExport]

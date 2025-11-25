@@ -18,6 +18,11 @@ const keyBoard: { [key: string]: any } = {
     currKeys: {}
 }
 
+const mouse = {
+    x: 0,
+    y: 0
+}
+
 const resizeObserver = new ResizeObserver(onResize);
 try {
     // only call us of the number of device pixels changed
@@ -41,8 +46,37 @@ setModuleImports("main.js", {
             keyBoard.currKeys[e.code] = true;
         };
 
+        var mouseMove = (e: MouseEvent) => {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            mouse.x = (e.clientX - rect.left) * dpr;
+            mouse.y = (e.clientY - rect.top) * dpr;
+            interop?.OnMouseMove(mouse.x, mouse.y);
+        };
+
+        var mouseDown = (e: MouseEvent) => {
+            keyBoard.currKeys[`Mouse${e.button}`] = false;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const x = (e.clientX - rect.left) * dpr;
+            const y = (e.clientY - rect.top) * dpr;
+            interop?.OnMouseDown(e.shiftKey, e.ctrlKey, e.altKey, e.button, x, y);
+        };
+
+        var mouseUp = (e: MouseEvent) => {
+            keyBoard.currKeys[`Mouse${e.button}`] = true;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const x = (e.clientX - rect.left) * dpr;
+            const y = (e.clientY - rect.top) * dpr;
+            interop?.OnMouseUp(e.shiftKey, e.ctrlKey, e.altKey, e.button, x, y);
+        };
+
         canvas.addEventListener("keydown", keyDown, false);
         canvas.addEventListener("keyup", keyUp, false);
+        canvas.addEventListener("mousemove", mouseMove, false);
+        canvas.addEventListener("mousedown", mouseDown, false);
+        canvas.addEventListener("mouseup", mouseUp, false);
         step();
     },
 

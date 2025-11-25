@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -41,6 +42,10 @@ public static class Program
         else if (Interop.IsKeyPressed(Keys.A))
             direction = SnakeCore.Direction.Left;
 
+        var startRequested = Interop.IsKeyPressed("Space") ||
+                             Interop.IsKeyPressed("Enter") ||
+                             Interop.IsKeyPressed("Mouse0");
+
         if(accumulator >= dt)
         {
             Interop.UpdateInput();
@@ -48,7 +53,7 @@ public static class Program
 
         while (accumulator >= dt)
         {
-            Game.Update(dt, direction);
+            Game.Update(dt, direction, startRequested);
             accumulator -= dt;
         }
 
@@ -61,6 +66,22 @@ public static class Program
     public static void CanvasResized(int width, int height)
     {
         Game?.CanvasResized(width, height);
+    }
+
+    public static void OnMouseMove(float x, float y)
+    {
+    }
+
+    public static void OnMouseDown(int button, float x, float y)
+    {
+        if (Game == null)
+            return;
+
+        Game.HandlePointerDown(new Vector2(x, y), button);
+    }
+
+    public static void OnMouseUp(int button, float x, float y)
+    {
     }
 
     public static void Main(string[] args)
