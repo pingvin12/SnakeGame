@@ -90,73 +90,12 @@ public static class Program
 
         // Ensure the JS side has already hooked up the canvas and input handlers before creating the GL context.
         Interop.Initialize();
-        Interop.EnsureCanvasReady();
+        var canvasReady = Interop.EnsureCanvasReady();
+        Console.WriteLine($"[Startup] Canvas ready: {canvasReady}");
 
-        var display = EGL.GetDisplay(IntPtr.Zero);
-        if (display == IntPtr.Zero)
-            throw new Exception("Display was null; ensure the canvas element is available and WebGL is enabled.");
-
-        if (!EGL.Initialize(display, out int major, out int minor))
-            throw new Exception($"Initialize() returned false (error: 0x{EGL.GetError():X}).");
-
-        int[] attributeListMsaa = new int[]
-        {
-            EGL.EGL_RED_SIZE  , 8,
-            EGL.EGL_GREEN_SIZE, 8,
-            EGL.EGL_BLUE_SIZE , 8,
-            EGL.EGL_SAMPLES, 16, //MSAA, 16 samples
-            EGL.EGL_NONE
-        };
-
-        int[] attributeListNoMsaa = new int[]
-        {
-            EGL.EGL_RED_SIZE  , 8,
-            EGL.EGL_GREEN_SIZE, 8,
-            EGL.EGL_BLUE_SIZE , 8,
-            EGL.EGL_NONE
-        };
-
-        var config = IntPtr.Zero;
-        var numConfig = IntPtr.Zero;
-
-        static bool TryChooseConfig(IntPtr displayHandle, int[] attributes, ref IntPtr chosenConfig, ref IntPtr availableConfig)
-        {
-            return EGL.ChooseConfig(displayHandle, attributes, ref chosenConfig, (IntPtr)1, ref availableConfig) && availableConfig != IntPtr.Zero;
-        }
-
-        if (!TryChooseConfig(display, attributeListMsaa, ref config, ref numConfig))
-        {
-            Console.WriteLine("Falling back to a non-MSAA EGL config.");
-            config = IntPtr.Zero;
-            numConfig = IntPtr.Zero;
-
-            if (!TryChooseConfig(display, attributeListNoMsaa, ref config, ref numConfig))
-            {
-                throw new Exception($"ChooseConfig() failed (error: 0x{EGL.GetError():X}).");
-            }
-        }
-
-        if (!EGL.BindApi(EGL.EGL_OPENGL_ES_API))
-            throw new Exception($"BindApi() failed (error: 0x{EGL.GetError():X}).");
-
-        // No other attribute is supported...
-        int[] ctxAttribs = new int[]
-        {
-            EGL.EGL_CONTEXT_CLIENT_VERSION, 3,
-            EGL.EGL_NONE 
-        };
-
-        var context = EGL.CreateContext(display, config, (IntPtr)EGL.EGL_NO_CONTEXT, ctxAttribs);
-        if (context == IntPtr.Zero)
-            throw new Exception($"CreateContext() failed (error: 0x{EGL.GetError():X}).");
-
-        // now create the surface
-        var surface = EGL.CreateWindowSurface(display, config, IntPtr.Zero, IntPtr.Zero);
-        if (surface == IntPtr.Zero)
-            throw new Exception($"CreateWindowSurface() failed (error: 0x{EGL.GetError():X}).");
-
-        if (!EGL.MakeCurrent(display, surface, surface, context))
-            throw new Exception($"MakeCurrent() failed (error: 0x{EGL.GetError():X}).");
+        var eglStartup = new EglStartup(new EglApi(), Console.WriteLine);
+        var eglHandles = eglStartup.Initialize();
+        Console.WriteLine($"[Startup] EGL handles display=0x{eglHandles.Display.ToInt64():X}, config=0x{eglHandles.Config.ToInt64():X}, context=0x{eglHandles.Context.ToInt64():X}, surface=0x{eglHandles.Surface.ToInt64():X} (v{eglHandles.MajorVersion}.{eglHandles.MinorVersion})");
 
         //_ = EGL.DestroyContext(display, context);
         //_ = EGL.DestroySurface(display, surface);

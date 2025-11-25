@@ -11,7 +11,7 @@ internal static partial class Interop
     public static partial void Initialize();
 
     [JSImport("ensureCanvasReady", "main.js")]
-    public static partial void EnsureCanvasReady();
+    public static partial bool EnsureCanvasReady();
 
     [JSImport("isKeyPressed", "main.js")]
     public static partial bool IsKeyPressed(string code);

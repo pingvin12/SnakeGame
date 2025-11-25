@@ -106,6 +106,9 @@ try {
 setModuleImports("main.js", {
     ensureCanvasReady: () => {
         resizeCanvasToDisplaySize();
+        const ready = Boolean(canvas && canvas.width > 0 && canvas.height > 0);
+        console.log(`[SnakeWebGL] ensureCanvasReady ready=${ready} size=${canvas.width}x${canvas.height} dpr=${window.devicePixelRatio}`);
+        return ready;
     },
 
     initialize: () => {
@@ -152,6 +155,7 @@ setModuleImports("main.js", {
         canvas.addEventListener("mousemove", mouseMove, false);
         canvas.addEventListener("mousedown", mouseDown, false);
         canvas.addEventListener("mouseup", mouseUp, false);
+        console.log("[SnakeWebGL] Input listeners attached");
         step();
     },
 
