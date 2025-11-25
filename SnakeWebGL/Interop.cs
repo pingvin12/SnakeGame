@@ -10,6 +10,9 @@ internal static partial class Interop
     [JSImport("initialize", "main.js")]
     public static partial void Initialize();
 
+    [JSImport("ensureCanvasReady", "main.js")]
+    public static partial void EnsureCanvasReady();
+
     [JSImport("isKeyPressed", "main.js")]
     public static partial bool IsKeyPressed(string code);
 

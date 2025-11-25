@@ -104,6 +104,10 @@ try {
 }
 
 setModuleImports("main.js", {
+    ensureCanvasReady: () => {
+        resizeCanvasToDisplaySize();
+    },
+
     initialize: () => {
         function step() {
             requestAnimationFrame(step); // The callback only called after this method returns.

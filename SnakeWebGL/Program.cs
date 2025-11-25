@@ -90,6 +90,7 @@ public static class Program
 
         // Ensure the JS side has already hooked up the canvas and input handlers before creating the GL context.
         Interop.Initialize();
+        Interop.EnsureCanvasReady();
 
         var display = EGL.GetDisplay(IntPtr.Zero);
         if (display == IntPtr.Zero)
