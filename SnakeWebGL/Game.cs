@@ -147,7 +147,7 @@ public partial class Game
             return;
 
         var worldPos = _renderer.ScreenToWorld(screenPosition);
-        if (_startButtonBounds.Contains(worldPos))
+        if (_startButtonBounds.Contains(new PointF(worldPos.X, worldPos.Y)))
         {
             StartGame();
         }
