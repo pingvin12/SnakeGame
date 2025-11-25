@@ -97,31 +97,47 @@ public static class Program
             throw new Exception("Display was null; ensure the canvas element is available and WebGL is enabled.");
 
         if (!EGL.Initialize(display, out int major, out int minor))
-            throw new Exception("Initialize() returned false.");
+            throw new Exception($"Initialize() returned false (error: 0x{EGL.GetError():X}).");
 
-        int[] attributeList = new int[]
+        int[] attributeListMsaa = new int[]
         {
             EGL.EGL_RED_SIZE  , 8,
             EGL.EGL_GREEN_SIZE, 8,
             EGL.EGL_BLUE_SIZE , 8,
-            //EGL.EGL_DEPTH_SIZE, 24,
-            //EGL.EGL_STENCIL_SIZE, 8,
-            //EGL.EGL_SURFACE_TYPE, EGL.EGL_WINDOW_BIT,
-            //EGL.EGL_RENDERABLE_TYPE, EGL.EGL_OPENGL_ES3_BIT,
             EGL.EGL_SAMPLES, 16, //MSAA, 16 samples
-            //EGL.EGL_SAMPLES, 0, //MSAA, 16 samples
+            EGL.EGL_NONE
+        };
+
+        int[] attributeListNoMsaa = new int[]
+        {
+            EGL.EGL_RED_SIZE  , 8,
+            EGL.EGL_GREEN_SIZE, 8,
+            EGL.EGL_BLUE_SIZE , 8,
             EGL.EGL_NONE
         };
 
         var config = IntPtr.Zero;
         var numConfig = IntPtr.Zero;
-        if (!EGL.ChooseConfig(display, attributeList, ref config, (IntPtr)1, ref numConfig))
-            throw new Exception("ChoseConfig() failed");
-        if (numConfig == IntPtr.Zero)
-            throw new Exception("ChoseConfig() returned no configs");
+
+        static bool TryChooseConfig(IntPtr displayHandle, int[] attributes, ref IntPtr chosenConfig, ref IntPtr availableConfig)
+        {
+            return EGL.ChooseConfig(displayHandle, attributes, ref chosenConfig, (IntPtr)1, ref availableConfig) && availableConfig != IntPtr.Zero;
+        }
+
+        if (!TryChooseConfig(display, attributeListMsaa, ref config, ref numConfig))
+        {
+            Console.WriteLine("Falling back to a non-MSAA EGL config.");
+            config = IntPtr.Zero;
+            numConfig = IntPtr.Zero;
+
+            if (!TryChooseConfig(display, attributeListNoMsaa, ref config, ref numConfig))
+            {
+                throw new Exception($"ChooseConfig() failed (error: 0x{EGL.GetError():X}).");
+            }
+        }
 
         if (!EGL.BindApi(EGL.EGL_OPENGL_ES_API))
-            throw new Exception("BindApi() failed");
+            throw new Exception($"BindApi() failed (error: 0x{EGL.GetError():X}).");
 
         // No other attribute is supported...
         int[] ctxAttribs = new int[]
@@ -132,15 +148,15 @@ public static class Program
 
         var context = EGL.CreateContext(display, config, (IntPtr)EGL.EGL_NO_CONTEXT, ctxAttribs);
         if (context == IntPtr.Zero)
-            throw new Exception("CreateContext() failed");
+            throw new Exception($"CreateContext() failed (error: 0x{EGL.GetError():X}).");
 
         // now create the surface
         var surface = EGL.CreateWindowSurface(display, config, IntPtr.Zero, IntPtr.Zero);
         if (surface == IntPtr.Zero)
-            throw new Exception("CreateWindowSurface() failed");
+            throw new Exception($"CreateWindowSurface() failed (error: 0x{EGL.GetError():X}).");
 
         if (!EGL.MakeCurrent(display, surface, surface, context))
-            throw new Exception("MakeCurrent() failed");
+            throw new Exception($"MakeCurrent() failed (error: 0x{EGL.GetError():X}).");
 
         //_ = EGL.DestroyContext(display, context);
         //_ = EGL.DestroySurface(display, surface);
