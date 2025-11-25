@@ -35,7 +35,54 @@ async function ensureCanvas(): Promise<HTMLCanvasElement> {
 
 const canvas = await ensureCanvas();
 dotnet.instance.Module["canvas"] = canvas;
-interop?.OnCanvasResize(canvas.width, canvas.height);
+
+function resizeCanvasToDisplaySize(entry?: ResizeObserverEntry) {
+    let width: number;
+    let height: number;
+    let dpr = window.devicePixelRatio;
+
+    if (entry?.devicePixelContentBoxSize) {
+        width = entry.devicePixelContentBoxSize[0].inlineSize;
+        height = entry.devicePixelContentBoxSize[0].blockSize;
+        dpr = 1; // already in physical pixels
+    } else if (entry?.contentBoxSize) {
+        if (Array.isArray(entry.contentBoxSize) && entry.contentBoxSize[0]) {
+            width = entry.contentBoxSize[0].inlineSize;
+            height = entry.contentBoxSize[0].blockSize;
+        } else {
+            // Firefox legacy path
+            // @ts-ignore
+            width = entry?.contentBoxSize?.inlineSize;
+            // @ts-ignore
+            height = entry?.contentBoxSize?.blockSize;
+        }
+    } else if (entry?.contentRect) {
+        width = entry.contentRect.width;
+        height = entry.contentRect.height;
+    } else {
+        // Fallback to current CSS size if no observer entry is provided
+        const rect = canvas.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height;
+    }
+
+    if (!width || !height) {
+        width = globalThis.innerWidth;
+        height = globalThis.innerHeight;
+    }
+
+    const displayWidth = Math.round(width * dpr);
+    const displayHeight = Math.round(height * dpr);
+
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+    }
+
+    interop?.OnCanvasResize(canvas.width, canvas.height);
+}
+
+resizeCanvasToDisplaySize();
 
 const keyBoard: { [key: string]: any } = {
     prevKeys: {},
@@ -118,33 +165,6 @@ await dotnet.run();
 
 function onResize(entries: ResizeObserverEntry[]) {
     for (const entry of entries) {
-        let width;
-        let height;
-        let dpr = window.devicePixelRatio;
-        if (entry.devicePixelContentBoxSize) {
-            // NOTE: Only this path gives the correct answer
-            // The other paths are imperfect fallbacks
-            // for browsers that don't provide anyway to do this
-            width = entry.devicePixelContentBoxSize[0].inlineSize;
-            height = entry.devicePixelContentBoxSize[0].blockSize;
-            dpr = 1; // it's already in width and height
-        } else if (entry.contentBoxSize) {
-            if (entry.contentBoxSize[0]) {
-                width = entry.contentBoxSize[0].inlineSize;
-                height = entry.contentBoxSize[0].blockSize;
-            } else {
-                // but old versions of Firefox treat it as a single item
-                // @ts-ignore
-                width = entry.contentBoxSize?.inlineSize;
-                // @ts-ignore
-                height = entry.contentBoxSize?.blockSize;
-            }
-        } else {
-            width = entry.contentRect.width;
-            height = entry.contentRect.height;
-        }
-        const displayWidth = Math.round(width * dpr);
-        const displayHeight = Math.round(height * dpr);
-        interop?.OnCanvasResize(canvas.width, canvas.height);
+        resizeCanvasToDisplaySize(entry);
     }
 }
