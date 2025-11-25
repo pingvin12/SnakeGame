@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SnakeWebGL;
 
@@ -41,10 +42,21 @@ internal sealed class EglApi : IEglApi
 
 internal readonly record struct EglHandles(IntPtr Display, IntPtr Config, IntPtr Context, IntPtr Surface, int MajorVersion, int MinorVersion);
 
+internal interface INativeLibraryLoader
+{
+    bool TryLoad(string libraryName);
+}
+
+internal sealed class NativeLibraryLoader : INativeLibraryLoader
+{
+    public bool TryLoad(string libraryName) => NativeLibrary.TryLoad(libraryName, out _);
+}
+
 internal sealed class EglStartup
 {
     private readonly IEglApi _egl;
     private readonly Action<string> _log;
+    private readonly INativeLibraryLoader _libraryLoader;
 
     private static readonly int[] AttributeListMsaa =
     {
@@ -69,10 +81,22 @@ internal sealed class EglStartup
         EGL.EGL_NONE
     };
 
-    public EglStartup(IEglApi eglApi, Action<string>? log)
+    public EglStartup(IEglApi eglApi, Action<string>? log, INativeLibraryLoader? libraryLoader = null)
     {
         _egl = eglApi ?? throw new ArgumentNullException(nameof(eglApi));
         _log = log ?? (_ => { });
+        _libraryLoader = libraryLoader ?? new NativeLibraryLoader();
+    }
+
+    public bool IsSupported()
+    {
+        var available = _libraryLoader.TryLoad(EGL.LibEgl);
+        if (!available)
+        {
+            _log($"[EGL] {EGL.LibEgl} not found; skipping EGL initialization");
+        }
+
+        return available;
     }
 
     public EglHandles Initialize()

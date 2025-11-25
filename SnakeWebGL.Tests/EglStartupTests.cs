@@ -59,6 +59,13 @@ internal sealed class FakeEgl : IEglApi
     public int GetError() => ErrorCode;
 }
 
+internal sealed class FakeLibraryLoader : INativeLibraryLoader
+{
+    public bool Result { get; set; }
+
+    public bool TryLoad(string libraryName) => Result;
+}
+
 public class EglStartupTests
 {
     [Fact]
@@ -106,5 +113,14 @@ public class EglStartupTests
         var result = method!.Invoke(null, new object[] { attributes });
 
         Assert.Equal("[12324=8]", result); // 12324 == EGL.EGL_RED_SIZE
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IsSupportedReflectsLibraryAvailability(bool available)
+    {
+        var startup = new EglStartup(new FakeEgl(), _ => { }, new FakeLibraryLoader { Result = available });
+        Assert.Equal(available, startup.IsSupported());
     }
 }

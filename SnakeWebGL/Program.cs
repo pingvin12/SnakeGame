@@ -94,18 +94,39 @@ public static class Program
         Console.WriteLine($"[Startup] Canvas ready: {canvasReady}");
 
         var eglStartup = new EglStartup(new EglApi(), Console.WriteLine);
-        EglHandles eglHandles;
-        try
+        bool eglActive = false;
+
+        if (eglStartup.IsSupported())
         {
-            eglHandles = eglStartup.Initialize();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[Startup] EGL initialization failed: {ex}");
-            throw;
+            try
+            {
+                var eglHandles = eglStartup.Initialize();
+                eglActive = true;
+                Console.WriteLine($"[Startup] EGL handles display=0x{eglHandles.Display.ToInt64():X}, config=0x{eglHandles.Config.ToInt64():X}, context=0x{eglHandles.Context.ToInt64():X}, surface=0x{eglHandles.Surface.ToInt64():X} (v{eglHandles.MajorVersion}.{eglHandles.MinorVersion})");
+            }
+            catch (DllNotFoundException ex)
+            {
+                Console.Error.WriteLine($"[Startup] EGL unavailable: {ex.Message}. Falling back to emscripten WebGL.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Startup] EGL initialization failed: {ex}");
+            }
         }
 
-        Console.WriteLine($"[Startup] EGL handles display=0x{eglHandles.Display.ToInt64():X}, config=0x{eglHandles.Config.ToInt64():X}, context=0x{eglHandles.Context.ToInt64():X}, surface=0x{eglHandles.Surface.ToInt64():X} (v{eglHandles.MajorVersion}.{eglHandles.MinorVersion})");
+        if (!eglActive)
+        {
+            try
+            {
+                var context = WebGlStartup.EnsureContext(Console.WriteLine);
+                Console.WriteLine($"[Startup] WebGL context 0x{context.ToInt64():X} ready via emscripten");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Startup] WebGL fallback failed: {ex}");
+                throw;
+            }
+        }
 
         //_ = EGL.DestroyContext(display, context);
         //_ = EGL.DestroySurface(display, surface);
@@ -113,7 +134,7 @@ public static class Program
 
         TrampolineFuncs.ApplyWorkaroundFixingInvocations();
         
-        var gl = GL.GetApi(EGL.GetProcAddress);
+        var gl = eglActive ? GL.GetApi(EGL.GetProcAddress) : GL.GetApi();
 
         Game = Game.Create(gl);
 

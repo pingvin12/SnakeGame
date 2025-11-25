@@ -3,17 +3,29 @@ using System.Runtime.InteropServices;
 
 namespace SnakeWebGL;
 
-internal static class Emscripten
-{
-	[DllImport("emscripten", EntryPoint = "emscripten_request_animation_frame_loop")]
-	[DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-	internal static extern unsafe void RequestAnimationFrameLoop(void* f, nint userDataPtr);
+    internal static class Emscripten
+    {
+        [DllImport("emscripten", EntryPoint = "emscripten_request_animation_frame_loop")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static extern unsafe void RequestAnimationFrameLoop(void* f, nint userDataPtr);
 
-    // emscripten_webgl_create_context
+        [DllImport("emscripten", EntryPoint = "emscripten_webgl_init_context_attributes")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static extern unsafe void WebGlInitContextAttributes(out EmscriptenWebGLContextAttributes attributes);
 
-    [DllImport("emscripten", EntryPoint = "emscripten_webgl_get_current_context")]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-    internal static extern unsafe IntPtr WebGlGetCurrentContext();
+        [DllImport("emscripten", EntryPoint = "emscripten_webgl_create_context")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static extern unsafe IntPtr WebGlCreateContext(string target, ref EmscriptenWebGLContextAttributes attribs);
+
+        [DllImport("emscripten", EntryPoint = "emscripten_webgl_make_context_current")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static extern unsafe int WebGlMakeContextCurrent(IntPtr context);
+
+        // emscripten_webgl_create_context
+
+        [DllImport("emscripten", EntryPoint = "emscripten_webgl_get_current_context")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static extern unsafe IntPtr WebGlGetCurrentContext();
 
     [DllImport("emscripten", EntryPoint = "emscripten_webgl_get_context_attributes")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
