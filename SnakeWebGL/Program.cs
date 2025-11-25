@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -41,6 +42,10 @@ public static class Program
         else if (Interop.IsKeyPressed(Keys.A))
             direction = SnakeCore.Direction.Left;
 
+        var startRequested = Interop.IsKeyPressed("Space") ||
+                             Interop.IsKeyPressed("Enter") ||
+                             Interop.IsKeyPressed("Mouse0");
+
         if(accumulator >= dt)
         {
             Interop.UpdateInput();
@@ -48,7 +53,7 @@ public static class Program
 
         while (accumulator >= dt)
         {
-            Game.Update(dt, direction);
+            Game.Update(dt, direction, startRequested);
             accumulator -= dt;
         }
 
@@ -63,59 +68,65 @@ public static class Program
         Game?.CanvasResized(width, height);
     }
 
+    public static void OnMouseMove(float x, float y)
+    {
+    }
+
+    public static void OnMouseDown(int button, float x, float y)
+    {
+        if (Game == null)
+            return;
+
+        Game.HandlePointerDown(new Vector2(x, y), button);
+    }
+
+    public static void OnMouseUp(int button, float x, float y)
+    {
+    }
+
     public static void Main(string[] args)
     {
         Console.WriteLine($"Hello from dotnet 9!");
 
-        var display = EGL.GetDisplay(IntPtr.Zero);
-        if (display == IntPtr.Zero)
-            throw new Exception("Display was null");
+        // Ensure the JS side has already hooked up the canvas and input handlers before creating the GL context.
+        Interop.Initialize();
+        var canvasReady = Interop.EnsureCanvasReady();
+        Console.WriteLine($"[Startup] Canvas ready: {canvasReady}");
 
-        if (!EGL.Initialize(display, out int major, out int minor))
-            throw new Exception("Initialize() returned false.");
+        var eglStartup = new EglStartup(new EglApi(), Console.WriteLine);
+        bool eglActive = false;
 
-        int[] attributeList = new int[]
+        if (eglStartup.IsSupported())
         {
-            EGL.EGL_RED_SIZE  , 8,
-            EGL.EGL_GREEN_SIZE, 8,
-            EGL.EGL_BLUE_SIZE , 8,
-            //EGL.EGL_DEPTH_SIZE, 24,
-            //EGL.EGL_STENCIL_SIZE, 8,
-            //EGL.EGL_SURFACE_TYPE, EGL.EGL_WINDOW_BIT,
-            //EGL.EGL_RENDERABLE_TYPE, EGL.EGL_OPENGL_ES3_BIT,
-            EGL.EGL_SAMPLES, 16, //MSAA, 16 samples
-            //EGL.EGL_SAMPLES, 0, //MSAA, 16 samples
-            EGL.EGL_NONE
-        };
+            try
+            {
+                var eglHandles = eglStartup.Initialize();
+                eglActive = true;
+                Console.WriteLine($"[Startup] EGL handles display=0x{eglHandles.Display.ToInt64():X}, config=0x{eglHandles.Config.ToInt64():X}, context=0x{eglHandles.Context.ToInt64():X}, surface=0x{eglHandles.Surface.ToInt64():X} (v{eglHandles.MajorVersion}.{eglHandles.MinorVersion})");
+            }
+            catch (DllNotFoundException ex)
+            {
+                Console.Error.WriteLine($"[Startup] EGL unavailable: {ex.Message}. Falling back to emscripten WebGL.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Startup] EGL initialization failed: {ex}");
+            }
+        }
 
-        var config = IntPtr.Zero;
-        var numConfig = IntPtr.Zero;
-        if (!EGL.ChooseConfig(display, attributeList, ref config, (IntPtr)1, ref numConfig))
-            throw new Exception("ChoseConfig() failed");
-        if (numConfig == IntPtr.Zero)
-            throw new Exception("ChoseConfig() returned no configs");
-
-        if (!EGL.BindApi(EGL.EGL_OPENGL_ES_API))
-            throw new Exception("BindApi() failed");
-
-        // No other attribute is supported...
-        int[] ctxAttribs = new int[]
+        if (!eglActive)
         {
-            EGL.EGL_CONTEXT_CLIENT_VERSION, 3,
-            EGL.EGL_NONE 
-        };
-
-        var context = EGL.CreateContext(display, config, (IntPtr)EGL.EGL_NO_CONTEXT, ctxAttribs);
-        if (context == IntPtr.Zero)
-            throw new Exception("CreateContext() failed");
-
-        // now create the surface
-        var surface = EGL.CreateWindowSurface(display, config, IntPtr.Zero, IntPtr.Zero);
-        if (surface == IntPtr.Zero)
-            throw new Exception("CreateWindowSurface() failed");
-
-        if (!EGL.MakeCurrent(display, surface, surface, context))
-            throw new Exception("MakeCurrent() failed");
+            try
+            {
+                var context = WebGlStartup.EnsureContext(Console.WriteLine);
+                Console.WriteLine($"[Startup] WebGL context 0x{context.ToInt64():X} ready via emscripten");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Startup] WebGL fallback failed: {ex}");
+                throw;
+            }
+        }
 
         //_ = EGL.DestroyContext(display, context);
         //_ = EGL.DestroySurface(display, surface);
@@ -124,8 +135,6 @@ public static class Program
         TrampolineFuncs.ApplyWorkaroundFixingInvocations();
         
         var gl = GL.GetApi(EGL.GetProcAddress);
-        Interop.Initialize();
-
 
         Game = Game.Create(gl);
 
